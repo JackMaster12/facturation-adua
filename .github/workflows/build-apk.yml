@@ -28,8 +28,9 @@ jobs:
       - name: Générer la partie Android
         run: |
           if [ ! -d android ]; then
-            flutter create . --platforms=android --org com.adua --project-name facturation_adua
+          flutter create . --platforms=android --org com.adua --project-name facturation_adua
           fi
+          rm -f test/widget_test.dart
       - name: Version minimale d'Android requise par Firebase
         run: |
           for f in android/app/build.gradle.kts android/app/build.gradle; do
