@@ -1,3 +1,4 @@
+
 name: Build APK
 on:
   push:
@@ -28,7 +29,7 @@ jobs:
       - name: Générer la partie Android
         run: |
           if [ ! -d android ]; then
-          flutter create . --platforms=android --org com.adua --project-name facturation_adua
+            flutter create . --platforms=android --org com.adua --project-name facturation_adua
           fi
           rm -f test/widget_test.dart
       - name: Version minimale d'Android requise par Firebase
@@ -39,8 +40,18 @@ jobs:
           true
       - run: flutter pub get
       - run: flutter test
-      - run: flutter build apk --release
+      - run: flutter build apk --release --split-per-abi
+      - name: Informations sur les APK
+        run: |
+          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -n 1)
+          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -n 1)
+          for f in build/app/outputs/flutter-apk/*-release.apk; do
+            echo "== $f"
+            ls -l "$f"
+            $AAPT dump badging "$f" | grep -E "^package|sdkVersion|targetSdkVersion|native-code" || true
+            $APKSIGNER verify --verbose "$f" | head -n 6 || true
+          done
       - uses: actions/upload-artifact@v4
         with:
           name: facturation-adua-apk
-          path: build/app/outputs/flutter-apk/app-release.apk
+          path: build/app/outputs/flutter-apk/*-release.apk
