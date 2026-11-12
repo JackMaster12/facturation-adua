@@ -1,4 +1,3 @@
-
 name: Build APK
 on:
   push:
@@ -8,6 +7,8 @@ on:
 jobs:
   apk:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
       - uses: actions/checkout@v4
       - name: Ranger les fichiers dans leurs dossiers
@@ -41,17 +42,15 @@ jobs:
       - run: flutter pub get
       - run: flutter test
       - run: flutter build apk --release --split-per-abi
-      - name: Informations sur les APK
+      - name: Publier l'APK dans une Release
+        env:
+          GH_TOKEN: ${{ github.token }}
         run: |
-          AAPT=$(ls $ANDROID_HOME/build-tools/*/aapt | tail -n 1)
-          APKSIGNER=$(ls $ANDROID_HOME/build-tools/*/apksigner | tail -n 1)
-          for f in build/app/outputs/flutter-apk/*-release.apk; do
-            echo "== $f"
-            ls -l "$f"
-            $AAPT dump badging "$f" | grep -E "^package|sdkVersion|targetSdkVersion|native-code" || true
-            $APKSIGNER verify --verbose "$f" | head -n 6 || true
-          done
-      - uses: actions/upload-artifact@v4
-        with:
-          name: facturation-adua-apk
-          path: build/app/outputs/flutter-apk/*-release.apk
+          cd build/app/outputs/flutter-apk
+          cp app-arm64-v8a-release.apk facturation-adua-arm64.apk
+          cp app-armeabi-v7a-release.apk facturation-adua-arm32.apk
+          gh release create "v0.1.${{ github.run_number }}" \
+            facturation-adua-arm64.apk facturation-adua-arm32.apk \
+            --repo "${{ github.repository }}" \
+            --title "Version 0.1.${{ github.run_number }}" \
+            --notes "APK Android. Choisir facturation-adua-arm64.apk pour la plupart des telephones."
