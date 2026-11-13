@@ -3,17 +3,19 @@ import 'package:flutter/material.dart';
 import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../services/facture_service.dart';
+import 'facture_commandes_screen.dart';
 import 'facture_ordonnances_screen.dart';
 
 class FacturesEnCoursScreen extends StatelessWidget {
-  const FacturesEnCoursScreen({super.key});
+  const FacturesEnCoursScreen({super.key, this.type = 'ordonnances'});
+  final String type;
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Factures en cours : ordonnances')),
+      appBar: AppBar(title: Text(type == 'ordonnances' ? 'Factures en cours : ordonnances' : 'Factures en cours : sur commande')),
       body: StreamBuilder<List<FactureData>>(
-        stream: FactureService.instance.factures('ordonnances', 'en_cours'),
+        stream: FactureService.instance.factures(type, 'en_cours'),
         builder: (context, snap) {
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final l = snap.data!;
@@ -28,7 +30,9 @@ class FacturesEnCoursScreen extends StatelessWidget {
                 subtitle: const Text('En cours'),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () => Navigator.push(
-                    context, MaterialPageRoute(builder: (_) => FactureOrdonnancesScreen(factureId: f.id))),
+                    context, MaterialPageRoute(builder: (_) => type == 'ordonnances'
+                        ? FactureOrdonnancesScreen(factureId: f.id)
+                        : FactureCommandesScreen(factureId: f.id))),
               ),
           ]);
         },

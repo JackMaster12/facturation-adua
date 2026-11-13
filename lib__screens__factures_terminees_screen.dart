@@ -52,8 +52,7 @@ class FacturesTermineesScreen extends StatelessWidget {
                 subtitle: Text('${formatMontant(f.total)} FCFA'
                     '${f.arreteLe == null ? '' : '  ·  arrêtée le ${formatDate(f.arreteLe!)}'}'),
                 trailing: Row(mainAxisSize: MainAxisSize.min, children: [
-                  if (f.type == 'ordonnances')
-                    IconButton(
+                  IconButton(
                         tooltip: 'Partager le PDF',
                         icon: const Icon(Icons.picture_as_pdf),
                         onPressed: () => partagerFacture(context, f)),

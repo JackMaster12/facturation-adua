@@ -44,8 +44,8 @@ class HomeScreen extends StatelessWidget {
         final boutons = <_Bouton>[
           _Bouton('Nouvelle facture sur ordonnances enfants', Icons.add_circle_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen()))),
           _Bouton('Facture en cours : ordonnances enfants', Icons.child_care, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen()))),
-          _Bouton('Nouvelle facture sur commande', Icons.add_box_outlined, () => bientot('Facture sur commande')),
-          _Bouton('Facture en cours : sur commande', Icons.local_shipping_outlined, () => bientot('Facture sur commande en cours')),
+          _Bouton('Nouvelle facture sur commande', Icons.add_box_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen(type: 'commandes')))),
+          _Bouton('Facture en cours : sur commande', Icons.local_shipping_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen(type: 'commandes')))),
           _Bouton('Factures terminées', Icons.task_alt, () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacturesTermineesScreen(profil: p)))),
           _Bouton('Générer un rapport', Icons.summarize_outlined, () => bientot('Rapport généré')),
           _Bouton('Rédiger un rapport', Icons.edit_note, () => bientot('Rapport rédigé')),

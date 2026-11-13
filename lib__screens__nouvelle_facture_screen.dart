@@ -2,10 +2,12 @@ import 'package:flutter/material.dart';
 
 import '../core/format.dart';
 import '../services/facture_service.dart';
+import 'facture_commandes_screen.dart';
 import 'facture_ordonnances_screen.dart';
 
 class NouvelleFactureScreen extends StatefulWidget {
-  const NouvelleFactureScreen({super.key});
+  const NouvelleFactureScreen({super.key, this.type = 'ordonnances'});
+  final String type;
 
   @override
   State<NouvelleFactureScreen> createState() => _NouvelleFactureScreenState();
@@ -18,15 +20,17 @@ class _NouvelleFactureScreenState extends State<NouvelleFactureScreen> {
 
   Future<void> _creer() async {
     setState(() => _occupe = true);
-    final id = idFacture('ordonnances', _mois, _annee);
+    final id = idFacture(widget.type, _mois, _annee);
     try {
-      final cree = await FactureService.instance.creer('ordonnances', _mois, _annee);
+      final cree = await FactureService.instance.creer(widget.type, _mois, _annee);
       if (!mounted) return;
       if (!cree) {
         ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
             content: Text('Une facture existe déjà pour ce mois. Ouverture de cette facture.')));
       }
-      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => FactureOrdonnancesScreen(factureId: id)));
+      Navigator.pushReplacement(context, MaterialPageRoute(builder: (_) => widget.type == 'ordonnances'
+          ? FactureOrdonnancesScreen(factureId: id)
+          : FactureCommandesScreen(factureId: id)));
     } catch (e) {
       if (!mounted) return;
       setState(() => _occupe = false);
@@ -38,11 +42,13 @@ class _NouvelleFactureScreenState extends State<NouvelleFactureScreen> {
   Widget build(BuildContext context) {
     final annees = [for (var a = DateTime.now().year - 2; a <= DateTime.now().year + 1; a++) a];
     return Scaffold(
-      appBar: AppBar(title: const Text('Nouvelle facture : ordonnances')),
+      appBar: AppBar(title: Text(widget.type == 'ordonnances' ? 'Nouvelle facture : ordonnances' : 'Nouvelle facture sur commande')),
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(crossAxisAlignment: CrossAxisAlignment.stretch, children: [
-          const Text('Une seule facture mensuelle pour tous les enfants.'),
+          Text(widget.type == 'ordonnances'
+              ? 'Une seule facture mensuelle pour tous les enfants.'
+              : 'Une seule facture mensuelle regroupe toutes les commandes du mois.'),
           const SizedBox(height: 16),
           DropdownButtonFormField<int>(
             value: _mois,

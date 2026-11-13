@@ -80,3 +80,55 @@ class FactureData {
     );
   }
 }
+
+class LigneCmd {
+  LigneCmd({required this.produit, required this.unite, required this.quantite, required this.montant});
+  final String produit;
+  final String unite;
+  final int quantite;
+  final int montant;
+
+  /// Prix unitaire calculé : montant total ÷ quantité (arrondi au franc).
+  int get prixUnitaire => quantite > 0 ? (montant / quantite).round() : 0;
+
+  Map<String, dynamic> toMap() => {'produit': produit, 'unite': unite, 'quantite': quantite, 'montant': montant};
+
+  factory LigneCmd.fromMap(Map<String, dynamic> m) => LigneCmd(
+        produit: (m['produit'] ?? '') as String,
+        unite: (m['unite'] ?? '') as String,
+        quantite: ((m['quantite'] ?? 0) as num).toInt(),
+        montant: ((m['montant'] ?? 0) as num).toInt(),
+      );
+}
+
+class CommandeData {
+  CommandeData({required this.id, required this.libelle, required this.date, required this.lignes});
+  final String id;
+  final String libelle;
+  final DateTime date;
+  final List<LigneCmd> lignes;
+
+  int get total => lignes.fold(0, (s, l) => s + l.montant);
+
+  factory CommandeData.fromDoc(DocumentSnapshot<Map<String, dynamic>> d) {
+    final m = d.data() ?? {};
+    final ts = m['date'];
+    final raw = (m['lignes'] ?? []) as List;
+    return CommandeData(
+      id: d.id,
+      libelle: (m['libelle'] ?? '') as String,
+      date: ts is Timestamp ? ts.toDate() : DateTime.now(),
+      lignes: [for (final e in raw) LigneCmd.fromMap(Map<String, dynamic>.from(e as Map))],
+    );
+  }
+}
+
+/// Les commandes sont numérotées (SOUS-TOTAL 1, 2, …) selon cet ordre : date, puis libellé.
+List<CommandeData> trierCommandes(Iterable<CommandeData> l) {
+  final r = [...l];
+  r.sort((a, b) {
+    final c = a.date.compareTo(b.date);
+    return c != 0 ? c : a.libelle.toLowerCase().compareTo(b.libelle.toLowerCase());
+  });
+  return r;
+}

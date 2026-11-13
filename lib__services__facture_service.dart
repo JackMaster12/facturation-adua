@@ -105,10 +105,52 @@ class FactureService {
     unawaited(_col.doc(id).update({'statut': 'en_cours'}).catchError((_) {}));
   }
 
+  CollectionReference<Map<String, dynamic>> _cmds(String id) => _col.doc(id).collection('commandes');
+
+  Stream<List<CommandeData>> commandes(String id) =>
+      _cmds(id).snapshots().map((s) => trierCommandes([for (final d in s.docs) CommandeData.fromDoc(d)]));
+
+  Future<List<CommandeData>> commandesUneFois(String id) async {
+    final s = await _cmds(id).get();
+    return trierCommandes([for (final d in s.docs) CommandeData.fromDoc(d)]);
+  }
+
+  void enregistrerCommande(String factureId, String? cmdId, DateTime date, String libelle, List<LigneCmd> lignes) {
+    final ref = cmdId == null ? _cmds(factureId).doc() : _cmds(factureId).doc(cmdId);
+    final total = lignes.fold<int>(0, (s, l) => s + l.montant);
+    unawaited(ref.set({
+      'date': Timestamp.fromDate(date),
+      'libelle': libelle,
+      'lignes': [for (final l in lignes) l.toMap()],
+      'total': total,
+      'majLe': FieldValue.serverTimestamp(),
+    }).catchError((_) {}));
+  }
+
+  void supprimerCommande(String factureId, String cmdId) {
+    unawaited(_cmds(factureId).doc(cmdId).delete().catchError((_) {}));
+  }
+
+  Future<({int total, String lettres, DateTime arreteLe})> arreterCommandes(String id) async {
+    final cmds = await commandesUneFois(id);
+    final total = cmds.fold<int>(0, (s, c) => s + c.total);
+    final lettres = montantEnLettres(total);
+    final maintenant = DateTime.now();
+    unawaited(_col.doc(id).update({
+      'statut': 'terminee',
+      'total': total,
+      'lettres': lettres,
+      'arreteLe': Timestamp.fromDate(maintenant),
+      'nbCommandes': cmds.length,
+    }).catchError((_) {}));
+    return (total: total, lettres: lettres, arreteLe: maintenant);
+  }
+
   Future<void> supprimer(String id) async {
     final s = await _ords(id).get();
+    final s2 = await _cmds(id).get();
     final batch = _db.batch();
-    for (final d in s.docs) {
+    for (final d in [...s.docs, ...s2.docs]) {
       batch.delete(d.reference);
     }
     batch.delete(_col.doc(id));
