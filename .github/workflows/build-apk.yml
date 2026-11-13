@@ -39,6 +39,10 @@ jobs:
             [ -f "$f" ] && sed -i 's/flutter\.minSdkVersion/23/' "$f"
           done
           true
+      - name: Clé de signature fixe (permet les mises à jour sans désinstaller)
+        run: |
+          mkdir -p ~/.android
+          if [ -f debug.keystore ]; then cp debug.keystore ~/.android/debug.keystore; fi
       - run: flutter pub get
       - run: flutter test
       - run: flutter build apk --release --split-per-abi
@@ -49,8 +53,8 @@ jobs:
           cd build/app/outputs/flutter-apk
           cp app-arm64-v8a-release.apk facturation-adua-arm64.apk
           cp app-armeabi-v7a-release.apk facturation-adua-arm32.apk
-          gh release create "v0.1.${{ github.run_number }}" \
+          gh release create "v0.2.${{ github.run_number }}" \
             facturation-adua-arm64.apk facturation-adua-arm32.apk \
             --repo "${{ github.repository }}" \
-            --title "Version 0.1.${{ github.run_number }}" \
-            --notes "APK Android. Choisir facturation-adua-arm64.apk pour la plupart des telephones."
+            --title "Version 0.2.${{ github.run_number }}" \
+            --notes "APK Android. Samsung A03 Core : installer facturation-adua-arm32.apk."
