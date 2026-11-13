@@ -4,6 +4,9 @@ import 'package:flutter/material.dart';
 import '../services/auth_service.dart';
 import 'admin_screen.dart';
 import 'base_donnees_screen.dart';
+import 'factures_en_cours_screen.dart';
+import 'factures_terminees_screen.dart';
+import 'nouvelle_facture_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -39,11 +42,11 @@ class HomeScreen extends StatelessWidget {
             .showSnackBar(SnackBar(content: Text('$nom : prévu aux phases suivantes.')));
 
         final boutons = <_Bouton>[
-          _Bouton('Nouvelle facture sur ordonnances enfants', Icons.add_circle_outline, () => bientot('Facture ordonnances')),
-          _Bouton('Facture en cours : ordonnances enfants', Icons.child_care, () => bientot('Facture ordonnances en cours')),
+          _Bouton('Nouvelle facture sur ordonnances enfants', Icons.add_circle_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen()))),
+          _Bouton('Facture en cours : ordonnances enfants', Icons.child_care, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen()))),
           _Bouton('Nouvelle facture sur commande', Icons.add_box_outlined, () => bientot('Facture sur commande')),
           _Bouton('Facture en cours : sur commande', Icons.local_shipping_outlined, () => bientot('Facture sur commande en cours')),
-          _Bouton('Factures terminées', Icons.task_alt, () => bientot('Factures terminées')),
+          _Bouton('Factures terminées', Icons.task_alt, () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacturesTermineesScreen(profil: p)))),
           _Bouton('Générer un rapport', Icons.summarize_outlined, () => bientot('Rapport généré')),
           _Bouton('Rédiger un rapport', Icons.edit_note, () => bientot('Rapport rédigé')),
           _Bouton('Base de données', Icons.storage_outlined,
