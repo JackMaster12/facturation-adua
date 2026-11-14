@@ -47,6 +47,11 @@ class FactureService {
         return l;
       });
 
+  Future<List<FactureData>> terminees() async {
+    final s = await _col.get();
+    return [for (final d in s.docs) FactureData.fromDoc(d)].where((f) => f.statut == 'terminee').toList();
+  }
+
   Stream<FactureData?> facture(String id) =>
       _col.doc(id).snapshots().map((d) => d.exists ? FactureData.fromDoc(d) : null);
 

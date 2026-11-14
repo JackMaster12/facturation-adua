@@ -7,6 +7,8 @@ import 'base_donnees_screen.dart';
 import 'factures_en_cours_screen.dart';
 import 'factures_terminees_screen.dart';
 import 'nouvelle_facture_screen.dart';
+import 'rapport_genere_screen.dart';
+import 'rapports_ecrits_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -47,8 +49,8 @@ class HomeScreen extends StatelessWidget {
           _Bouton('Nouvelle facture sur commande', Icons.add_box_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen(type: 'commandes')))),
           _Bouton('Facture en cours : sur commande', Icons.local_shipping_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen(type: 'commandes')))),
           _Bouton('Factures terminées', Icons.task_alt, () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacturesTermineesScreen(profil: p)))),
-          _Bouton('Générer un rapport', Icons.summarize_outlined, () => bientot('Rapport généré')),
-          _Bouton('Rédiger un rapport', Icons.edit_note, () => bientot('Rapport rédigé')),
+          _Bouton('Générer un rapport', Icons.summarize_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RapportGenereScreen()))),
+          _Bouton('Rédiger un rapport', Icons.edit_note, () => Navigator.push(context, MaterialPageRoute(builder: (_) => RapportsEcritsScreen(profil: p)))),
           _Bouton('Base de données', Icons.storage_outlined,
               () => Navigator.push(context, MaterialPageRoute(builder: (_) => BaseDonneesScreen(profil: p)))),
           if (p.isAdmin)
