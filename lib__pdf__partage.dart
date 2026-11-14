@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../core/entreprise.dart';
 import '../core/format.dart';
 import '../core/montant_en_lettres.dart';
 import '../models/ordonnance.dart';
@@ -12,6 +13,7 @@ import 'facture_ordonnances_pdf.dart';
 Future<void> partagerFacture(BuildContext context, FactureData f) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
+    await Entreprise.charger();
     final arretee = f.arreteLe ?? DateTime.now();
     final nom = numeroFacture(f.mois, f.annee).replaceAll(' ', '-');
     if (f.type == 'ordonnances') {

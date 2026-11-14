@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../core/entreprise.dart';
 import '../core/format.dart';
 import '../models/rapport.dart';
 import '../pdf/rapport_pdf.dart';
@@ -11,6 +12,7 @@ import 'rapport_form_screen.dart';
 Future<void> partagerRapportEcrit(BuildContext context, RapportData r) async {
   final messenger = ScaffoldMessenger.of(context);
   try {
+    await Entreprise.charger();
     final octets = await genererPdfRapport(
       mois: r.mois,
       message: r.message,

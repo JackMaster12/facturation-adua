@@ -2,6 +2,8 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/sauvegarde_service.dart';
+import 'entreprise_screen.dart';
 
 class AdminScreen extends StatelessWidget {
   const AdminScreen({super.key});
@@ -55,6 +57,27 @@ class AdminScreen extends StatelessWidget {
           return ListView(
             padding: const EdgeInsets.only(bottom: 90),
             children: [
+              ListTile(
+                leading: const Icon(Icons.business),
+                title: const Text('Informations de l\'entreprise'),
+                subtitle: const Text('Émetteur, NIF, compte bancaire, client'),
+                onTap: () => Navigator.push(context, MaterialPageRoute(builder: (_) => const EntrepriseScreen())),
+              ),
+              ListTile(
+                leading: const Icon(Icons.backup_outlined),
+                title: const Text('Sauvegarder les données'),
+                subtitle: const Text('Crée un fichier à envoyer (WhatsApp, e-mail, Drive)'),
+                onTap: () async {
+                  final messenger = ScaffoldMessenger.of(context);
+                  messenger.showSnackBar(const SnackBar(content: Text('Préparation de la sauvegarde…')));
+                  try {
+                    await sauvegarderDonnees();
+                  } catch (e) {
+                    messenger.showSnackBar(SnackBar(content: Text('Sauvegarde impossible : $e')));
+                  }
+                },
+              ),
+              const Divider(),
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Text('Comptes. Un compte désactivé ne peut plus utiliser l\'application.'),

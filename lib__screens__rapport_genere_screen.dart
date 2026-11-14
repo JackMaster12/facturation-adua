@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:printing/printing.dart';
 
+import '../core/entreprise.dart';
 import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../models/rapport.dart';
@@ -32,6 +33,7 @@ class _RapportGenereScreenState extends State<RapportGenereScreen> {
     if (fin - debut > 35) return _msg('Période trop longue (36 mois maximum).');
     setState(() => _occupe = true);
     try {
+      await Entreprise.charger();
       final toutes = await FactureService.instance.terminees();
       final mois = <MoisRapport>[];
       for (var k = debut; k <= fin; k++) {
