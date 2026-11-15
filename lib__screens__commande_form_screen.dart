@@ -4,15 +4,15 @@ import '../core/dates.dart';
 import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../services/facture_service.dart';
+import '../services/unites_service.dart';
 import '../widgets/selecteur_nom.dart';
 
 class _LigneEdit {
-  _LigneEdit({this.produit = '', String unite = '', String qte = '1', String montant = ''})
-      : unite = TextEditingController(text: unite),
-        qte = TextEditingController(text: qte),
+  _LigneEdit({this.produit = '', this.unite = '', String qte = '1', String montant = ''})
+      : qte = TextEditingController(text: qte),
         montant = TextEditingController(text: montant);
   String produit;
-  final TextEditingController unite;
+  String unite;
   final TextEditingController qte;
   final TextEditingController montant;
 }
@@ -43,6 +43,7 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
       }
     }
     if (_lignes.isEmpty) _lignes.add(_LigneEdit());
+    semerUnites();
   }
 
   int get _total => _lignes.fold(0, (s, l) => s + parseEntier(l.montant.text));
@@ -68,7 +69,7 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
       final m = parseEntier(l.montant.text);
       if (q <= 0) return _msg('Saisir la quantité de « ${l.produit} ».');
       if (m <= 0) return _msg('Saisir le montant de « ${l.produit} ».');
-      lignes.add(LigneCmd(produit: l.produit, unite: l.unite.text.trim(), quantite: q, montant: m));
+      lignes.add(LigneCmd(produit: l.produit, unite: l.unite.trim(), quantite: q, montant: m));
     }
     if (lignes.isEmpty) return _msg('Ajouter au moins un produit.');
     FactureService.instance
@@ -139,10 +140,11 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                   ),
                 ]),
                 const SizedBox(height: 8),
-                TextField(
-                  controller: _lignes[i].unite,
-                  decoration: const InputDecoration(
-                      labelText: 'Unité', hintText: 'Boîte, boîte/10, plaquette, rouleau…', border: OutlineInputBorder()),
+                SelecteurNom(
+                  collection: 'unites',
+                  libelle: 'Unité',
+                  valeur: _lignes[i].unite,
+                  onChoisi: (v) => setState(() => _lignes[i].unite = v),
                 ),
                 const SizedBox(height: 8),
                 Row(children: [

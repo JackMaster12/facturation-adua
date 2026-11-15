@@ -2,23 +2,37 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
+import '../services/unites_service.dart';
 
-class BaseDonneesScreen extends StatelessWidget {
+class BaseDonneesScreen extends StatefulWidget {
   const BaseDonneesScreen({super.key, required this.profil});
   final UserProfile profil;
 
   @override
+  State<BaseDonneesScreen> createState() => _BaseDonneesScreenState();
+}
+
+class _BaseDonneesScreenState extends State<BaseDonneesScreen> {
+  @override
+  void initState() {
+    super.initState();
+    semerUnites();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final profil = widget.profil;
     return DefaultTabController(
-      length: 2,
+      length: 3,
       child: Scaffold(
         appBar: AppBar(
           title: const Text('Base de données'),
-          bottom: const TabBar(tabs: [Tab(text: 'Bénéficiaires'), Tab(text: 'Produits')]),
+          bottom: const TabBar(tabs: [Tab(text: 'Bénéficiaires'), Tab(text: 'Produits'), Tab(text: 'Unités')]),
         ),
         body: TabBarView(children: [
           _ListeNoms(collection: 'beneficiaires', champ: 'nom', libelle: 'Nom de l\'enfant', profil: profil),
           _ListeNoms(collection: 'produits', champ: 'nom', libelle: 'Nom du produit', profil: profil),
+          _ListeNoms(collection: 'unites', champ: 'nom', libelle: 'Unité (ex. Boîte/10)', profil: profil),
         ]),
       ),
     );
