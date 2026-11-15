@@ -57,32 +57,28 @@ class FactureService {
 
   CollectionReference<Map<String, dynamic>> _ords(String id) => _col.doc(id).collection('ordonnances');
 
-  Stream<List<OrdonnanceData>> ordonnances(String id) => _ords(id).snapshots().map((s) {
-        final l = [for (final d in s.docs) OrdonnanceData.fromDoc(d)];
-        l.sort((a, b) {
-          final c = a.enfant.toLowerCase().compareTo(b.enfant.toLowerCase());
-          return c != 0 ? c : a.date.compareTo(b.date);
-        });
-        return l;
-      });
+  Stream<List<OrdonnanceData>> ordonnances(String id) => _ords(id)
+      .snapshots()
+      .map((s) => trierOrdonnancesSaisie([for (final d in s.docs) OrdonnanceData.fromDoc(d)]));
 
   Future<List<OrdonnanceData>> ordonnancesUneFois(String id) async {
     final s = await _ords(id).get();
     return [for (final d in s.docs) OrdonnanceData.fromDoc(d)];
   }
 
-  void enregistrerOrdonnance(String factureId, String? ordId, DateTime date, String numero, String enfant,
-      List<LigneOrd> lignes) {
+  void enregistrerOrdonnance(String factureId, String? ordId, DateTime date, String enfant, List<LigneOrd> lignes) {
     final ref = ordId == null ? _ords(factureId).doc() : _ords(factureId).doc(ordId);
     final total = lignes.fold<int>(0, (s, l) => s + l.montant);
-    unawaited(ref.set({
+    final donnees = <String, dynamic>{
       'date': Timestamp.fromDate(date),
-      'numero': numero,
       'enfant': enfant,
       'lignes': [for (final l in lignes) l.toMap()],
       'total': total,
       'majLe': FieldValue.serverTimestamp(),
-    }).catchError((_) {}));
+    };
+    // L'ordre de saisie est fixé à la création et ne change plus.
+    if (ordId == null) donnees['ordre'] = DateTime.now().millisecondsSinceEpoch;
+    unawaited(ref.set(donnees, SetOptions(merge: true)).catchError((_) {}));
   }
 
   void supprimerOrdonnance(String factureId, String ordId) {
@@ -123,13 +119,15 @@ class FactureService {
   void enregistrerCommande(String factureId, String? cmdId, DateTime date, String libelle, List<LigneCmd> lignes) {
     final ref = cmdId == null ? _cmds(factureId).doc() : _cmds(factureId).doc(cmdId);
     final total = lignes.fold<int>(0, (s, l) => s + l.montant);
-    unawaited(ref.set({
+    final donnees = <String, dynamic>{
       'date': Timestamp.fromDate(date),
       'libelle': libelle,
       'lignes': [for (final l in lignes) l.toMap()],
       'total': total,
       'majLe': FieldValue.serverTimestamp(),
-    }).catchError((_) {}));
+    };
+    if (cmdId == null) donnees['ordre'] = DateTime.now().millisecondsSinceEpoch;
+    unawaited(ref.set(donnees, SetOptions(merge: true)).catchError((_) {}));
   }
 
   void supprimerCommande(String factureId, String cmdId) {

@@ -7,6 +7,7 @@ import '../core/entreprise.dart';
 import '../core/format.dart';
 import '../core/hash.dart';
 import '../models/ordonnance.dart';
+import 'outils_pdf.dart';
 import 'facture_ordonnances_pdf.dart' show paginer;
 
 const double _marge = 28;
@@ -44,6 +45,7 @@ Future<Uint8List> genererPdfCommandes({
 }) async {
   final normal = pw.Font.helvetica();
   final gras = pw.Font.helveticaBold();
+  final grasItalique = pw.Font.helveticaBoldOblique();
   final numero = numeroFacture(facture.mois, facture.annee);
   final titre = 'FACTURE SUR COMMANDE N° $numero';
   final cmds = trierCommandes(commandes);
@@ -70,8 +72,7 @@ Future<Uint8List> genererPdfCommandes({
     lignes.add(_Ligne('sousTotal', 22, texte: 'SOUS-TOTAL ${i + 1}', cells: [formatMontant(c.total)]));
   }
 
-  final phrase = 'Arrêtée la présente facture à la somme de : $lettres.';
-  final motsH = ((phrase.length + 69) ~/ 70) * 15.0 + 8;
+  final motsH = hauteurMontantEnLettres(lettres);
   const sigH = 80.0;
   const totalGenH = 36.0;
   final fin = totalGenH + 14 + motsH + 14 + sigH + 6;
@@ -219,7 +220,7 @@ Future<Uint8List> genererPdfCommandes({
           child: pw.Text('TOTAL GÉNÉRAL : ${formatMontant(total)} FCFA', style: _st(gras, size: 16)),
         ),
         pw.SizedBox(height: 14),
-        pw.SizedBox(height: motsH, child: pw.Text(phrase, style: _st(normal))),
+        blocMontantEnLettres(lettres: lettres, normal: normal, grasItalique: grasItalique, largeur: _largeur),
         pw.SizedBox(height: 14),
         pw.SizedBox(
           height: sigH,

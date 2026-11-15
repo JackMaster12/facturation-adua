@@ -57,31 +57,39 @@ class FactureOrdonnancesScreen extends StatelessWidget {
             final ords = os.data ?? <OrdonnanceData>[];
             final total = ords.fold<int>(0, (s, o) => s + o.total);
             final items = <Widget>[];
-            String? courant;
+            final numeros = numerosOrdonnances(ords);
+            // Enfants dans l'ordre de leur première saisie ; ordonnances dans l'ordre de saisie.
+            final enfants = <String>[];
+            final groupes = <String, List<OrdonnanceData>>{};
             for (final o in ords) {
-              if (o.enfant != courant) {
-                courant = o.enfant;
-                final tEnfant = ords.where((x) => x.enfant == o.enfant).fold<int>(0, (s, x) => s + x.total);
-                items.add(Container(
-                  color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  child: Row(children: [
-                    Expanded(child: Text(o.enfant, style: const TextStyle(fontWeight: FontWeight.bold))),
-                    Text('${formatMontant(tEnfant)} FCFA'),
-                  ]),
+              if (!groupes.containsKey(o.enfant)) {
+                enfants.add(o.enfant);
+                groupes[o.enfant] = [];
+              }
+              groupes[o.enfant]!.add(o);
+            }
+            for (final e in enfants) {
+              final l = groupes[e]!;
+              final tEnfant = l.fold<int>(0, (s, x) => s + x.total);
+              items.add(Container(
+                color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(children: [
+                  Expanded(child: Text(e, style: const TextStyle(fontWeight: FontWeight.bold))),
+                  Text('${formatMontant(tEnfant)} FCFA'),
+                ]),
+              ));
+              for (final o in l) {
+                items.add(ListTile(
+                  title: Text('N° ${numeros[o.id]}  ·  ${formatDate(o.date)}'),
+                  subtitle: Text(o.lignes.map((l) => '${l.produit} ×${l.quantite}').join(', ')),
+                  trailing: Text(formatMontant(o.total)),
+                  onTap: f.enCours
+                      ? () => Navigator.push(context,
+                          MaterialPageRoute(builder: (_) => OrdonnanceFormScreen(facture: f, ordonnance: o)))
+                      : null,
                 ));
               }
-              items.add(ListTile(
-                title: Text('N° ${o.numero}  ·  ${formatDate(o.date)}'),
-                subtitle: Text(o.lignes.map((l) => '${l.produit} ×${l.quantite}').join(', ')),
-                trailing: Text('${formatMontant(o.total)}'),
-                onTap: f.enCours
-                    ? () => Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                            builder: (_) => OrdonnanceFormScreen(facture: f, ordonnance: o)))
-                    : null,
-              ));
             }
             return Scaffold(
               appBar: AppBar(title: Text('Facture ${numeroFacture(f.mois, f.annee)}')),

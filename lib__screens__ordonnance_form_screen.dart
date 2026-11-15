@@ -26,7 +26,6 @@ class OrdonnanceFormScreen extends StatefulWidget {
 
 class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
   late final TextEditingController _date;
-  late final TextEditingController _numero;
   String _enfant = '';
   final List<_LigneEdit> _lignes = [];
 
@@ -35,7 +34,6 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
     super.initState();
     final o = widget.ordonnance;
     _date = TextEditingController(text: formatDate(o?.date ?? DateTime.now()));
-    _numero = TextEditingController(text: o?.numero ?? '');
     _enfant = o?.enfant ?? '';
     if (o != null) {
       for (final l in o.lignes) {
@@ -52,7 +50,6 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
   void _enregistrer() {
     final d = parseDate(_date.text);
     if (d == null) return _msg('Date invalide. Écrire par exemple 23/10/2026.');
-    if (_numero.text.trim().isEmpty) return _msg('Saisir le numéro d\'ordonnance.');
     if (_enfant.isEmpty) return _msg('Choisir l\'enfant.');
     final lignes = <LigneOrd>[];
     for (final l in _lignes) {
@@ -64,7 +61,7 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
     }
     if (lignes.isEmpty) return _msg('Ajouter au moins un produit.');
     FactureService.instance
-        .enregistrerOrdonnance(widget.facture.id, widget.ordonnance?.id, d, _numero.text.trim(), _enfant, lignes);
+        .enregistrerOrdonnance(widget.facture.id, widget.ordonnance?.id, d, _enfant, lignes);
     Navigator.pop(context);
   }
 
@@ -101,10 +98,7 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
           decoration: const InputDecoration(labelText: 'Date (JJ/MM/AAAA)', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
-        TextField(
-          controller: _numero,
-          decoration: const InputDecoration(labelText: 'N° d\'ordonnance', border: OutlineInputBorder()),
-        ),
+        const Text('Le numéro de l\'ordonnance est attribué automatiquement (1, 2, 3… pour chaque enfant).'),
         const SizedBox(height: 12),
         SelecteurNom(
           collection: 'beneficiaires',

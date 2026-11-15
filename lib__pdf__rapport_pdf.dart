@@ -29,8 +29,8 @@ class _R {
   bool dernier; // dernière ligne de son bloc
 }
 
-double _haut(String lettres, String label, {double base = 12, double hmin = 22}) {
-  final a = lettres.isEmpty ? 1 : ((lettres.length + 31) ~/ 32);
+double _haut(String lettres, String label, {double base = 12, double hmin = 22, int cpl = 32}) {
+  final a = lettres.isEmpty ? 1 : ((lettres.length + cpl - 1) ~/ cpl);
   final b = label.isEmpty ? 1 : ((label.length + 17) ~/ 18);
   final n = a > b ? a : b;
   final h = n * (base + 3) + 7;
@@ -64,9 +64,9 @@ Future<Uint8List> genererPdfRapport({
     final lt = nombreEnLettres(m.total);
     rows.add(_R(b, 'total', _haut(lt, 'Total du mois'), ['', 'Total du mois', formatMontant(m.total), lt], dernier: true));
   }
-  final lg = nombreEnLettres(totalGeneral);
+  final lg = nombreEnLettres(totalGeneral).toUpperCase();
   final bGen = tries.length;
-  rows.add(_R(bGen, 'general', _haut(lg, 'Total général', base: 16, hmin: 30) + 4, ['', 'Total général', formatMontant(totalGeneral), lg],
+  rows.add(_R(bGen, 'general', _haut(lg, 'TOTAL GÉNÉRAL', base: 16, hmin: 30, cpl: 19) + 4, ['', 'TOTAL GÉNÉRAL', formatMontant(totalGeneral), lg],
       dernier: true));
 
   // Une page ne coupe jamais un mois : toutes les lignes d'un bloc restent ensemble.
@@ -99,14 +99,31 @@ Future<Uint8List> genererPdfRapport({
       '${manuel ? 'saisie manuelle | ' : ''}genere le ${formatDate(date)} | $code';
 
   pw.Widget cellule(String t, double w, double h, pw.Font f,
-      {bool last = false, pw.Alignment al = pw.Alignment.centerLeft, double size = 12, PdfColor? couleur}) {
+      {bool last = false,
+      pw.Alignment al = pw.Alignment.center,
+      double size = 12,
+      PdfColor? couleur,
+      PdfColor? fond,
+      bool souligne = false}) {
     return pw.Container(
       width: w,
       height: h,
       alignment: al,
       padding: const pw.EdgeInsets.symmetric(horizontal: 3),
-      decoration: last ? null : const pw.BoxDecoration(border: pw.Border(right: pw.BorderSide(width: 0.6))),
-      child: pw.Text(t, style: _st(f, size: size, couleur: couleur)),
+      decoration: pw.BoxDecoration(
+        color: fond,
+        border: last ? null : const pw.Border(right: pw.BorderSide(width: 0.6)),
+      ),
+      child: pw.Text(
+        t,
+        textAlign: pw.TextAlign.center,
+        style: pw.TextStyle(
+          font: f,
+          fontSize: size,
+          color: couleur ?? PdfColors.black,
+          decoration: souligne ? pw.TextDecoration.underline : null,
+        ),
+      ),
     );
   }
 
@@ -152,34 +169,61 @@ Future<Uint8List> genererPdfRapport({
         ]),
       );
 
+  // Ligne d'un mois : toutes les données sont centrées.
   pw.Widget ligne(_R r) {
     final g = r.type == 'ligne' ? normal : gras;
-    final gen = r.type == 'general';
     return pw.Container(
-      width: _largeur - 6,
-      height: r.h - (gen ? 4 : 0),
+      width: _largeur - 6 - (_wMois - 3),
+      height: r.h,
       decoration: r.dernier ? null : const pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: 0.6))),
       child: pw.Row(children: [
-        cellule(r.cells[0], _wMois - 3, r.h - (gen ? 4 : 0), r.type == 'ligne' ? gras : g),
-        cellule(r.cells[1], _wFact, r.h - (gen ? 4 : 0), g, size: gen ? 14 : 12),
-        cellule(r.cells[2], _wMont, r.h - (gen ? 4 : 0), g,
-            al: pw.Alignment.centerRight, size: gen ? 16 : 12),
-        cellule(r.cells[3], _wLettre - 3, r.h - (gen ? 4 : 0), g,
-            last: true, couleur: gen ? _rouge : null),
+        cellule(r.cells[1], _wFact, r.h, g),
+        cellule(r.cells[2], _wMont, r.h, g),
+        cellule(r.cells[3], _wLettre - 3, r.h, g, last: true),
+      ]),
+    );
+  }
+
+  // Ligne du total général : « TOTAL GÉNÉRAL » fusionné sur Mois + Factures, rempli en gris comme l'en-tête.
+  pw.Widget ligneGenerale(_R r) {
+    final h = r.h - 4;
+    return pw.Container(
+      width: _largeur - 6,
+      height: h,
+      child: pw.Row(children: [
+        cellule(r.cells[1], _wMois - 3 + _wFact, h, gras, size: 16, fond: PdfColors.grey200),
+        cellule(r.cells[2], _wMont, h, gras, size: 16),
+        cellule(r.cells[3], _wLettre - 3, h, gras, last: true, couleur: _rouge, souligne: true),
       ]),
     );
   }
 
   // Contour extérieur épais et foncé pour chaque mois (et pour le total général).
-  pw.Widget bloc(List<_R> l) => pw.Column(children: [
-        pw.Container(
-          width: _largeur,
-          padding: const pw.EdgeInsets.all(1),
-          decoration: pw.BoxDecoration(border: pw.Border.all(width: 2, color: PdfColors.black)),
-          child: pw.Column(children: [for (final r in l) ligne(r)]),
-        ),
-        pw.SizedBox(height: 10),
+  // Le nom du mois est une seule cellule fusionnée sur toutes les lignes du mois.
+  pw.Widget bloc(List<_R> l) {
+    pw.Widget contenu;
+    if (l.first.type == 'general') {
+      contenu = ligneGenerale(l.first);
+    } else {
+      var h = 0.0;
+      for (final r in l) {
+        h += r.h;
+      }
+      contenu = pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+        cellule(l.first.cells[0], _wMois - 3, h, gras),
+        pw.Column(children: [for (final r in l) ligne(r)]),
       ]);
+    }
+    return pw.Column(children: [
+      pw.Container(
+        width: _largeur,
+        padding: const pw.EdgeInsets.all(1),
+        decoration: pw.BoxDecoration(border: pw.Border.all(width: 2, color: PdfColors.black)),
+        child: contenu,
+      ),
+      pw.SizedBox(height: 10),
+    ]);
+  }
 
   pw.Widget bas() => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         if (msg.isNotEmpty)

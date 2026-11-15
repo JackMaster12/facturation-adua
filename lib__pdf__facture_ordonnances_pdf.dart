@@ -7,6 +7,7 @@ import '../core/entreprise.dart';
 import '../core/format.dart';
 import '../core/hash.dart';
 import '../models/ordonnance.dart';
+import 'outils_pdf.dart';
 
 // ---- Dimensions (en points PDF) -------------------------------------------
 const double _marge = 28;
@@ -64,18 +65,32 @@ List<List<int>> paginer(List<double> h, List<bool> keep, double cap1, double cap
   return pages;
 }
 
-class _Ligne {
-  _Ligne(this.type, this.h, {this.keep = false, this.cells = const [], this.texte = ''});
-  final String type; // bandeau | ligne | totalEnfant
+class _U {
+  _U(this.type, this.h, {this.keep = false, this.texte = '', this.ord, this.dateKey = '', this.numero = 0});
+  final String type; // bandeau | ord | totalEnfant
   final double h;
   bool keep;
-  final List<String> cells; // date, numéro, produit, quantité, montant
   final String texte;
+  final OrdonnanceData? ord;
+  final String dateKey;
+  final int numero;
 }
 
 double _hauteurTexte(String t) {
   final n = t.isEmpty ? 1 : ((t.length + _carParLigne - 1) ~/ _carParLigne);
   return n * 14.0 + 6;
+}
+
+const double _ecartOrd = 4; // bande entre deux ordonnances : forme le double trait
+
+/// Hauteur des produits d'une ordonnance, sans le double trait de séparation.
+double _hauteurProduits(OrdonnanceData o) {
+  if (o.lignes.isEmpty) return 20;
+  var h = 0.0;
+  for (final l in o.lignes) {
+    h += _hauteurTexte(l.produit);
+  }
+  return h;
 }
 
 pw.TextStyle _st(pw.Font f, {double size = 12}) => pw.TextStyle(font: f, fontSize: size);
@@ -89,55 +104,37 @@ Future<Uint8List> genererPdfOrdonnances({
 }) async {
   final normal = pw.Font.helvetica();
   final gras = pw.Font.helveticaBold();
+  final grasItalique = pw.Font.helveticaBoldOblique();
   final numero = numeroFacture(facture.mois, facture.annee);
   final titre = 'FACTURE SUR ORDONNANCES ENFANTS N° $numero';
 
-  // Regroupement par enfant, puis par date et numéro.
-  final tri = [...ordonnances]..sort((a, b) {
-      final c = a.enfant.toLowerCase().compareTo(b.enfant.toLowerCase());
-      if (c != 0) return c;
-      final d = a.date.compareTo(b.date);
-      return d != 0 ? d : a.numero.compareTo(b.numero);
-    });
-
-  final lignes = <_Ligne>[];
-  String? courant;
-  int totEnfant = 0;
-  void clore() {
-    if (courant == null) return;
-    lignes.last.keep = true;
-    lignes.add(_Ligne('totalEnfant', 22, texte: 'TOTAL $courant : ${formatMontant(totEnfant)} FCFA'));
-  }
-
+  // Ordre de saisie : enfants dans l'ordre de leur première saisie, ordonnances dans l'ordre de saisie.
+  final tri = trierOrdonnancesSaisie(ordonnances);
+  final numeros = numerosOrdonnances(ordonnances);
+  final enfants = <String>[];
+  final groupes = <String, List<OrdonnanceData>>{};
   for (final o in tri) {
-    if (o.enfant != courant) {
-      clore();
-      courant = o.enfant;
-      totEnfant = 0;
-      lignes.add(_Ligne('bandeau', 22, keep: true, texte: o.enfant));
+    if (!groupes.containsKey(o.enfant)) {
+      enfants.add(o.enfant);
+      groupes[o.enfant] = [];
     }
-    totEnfant += o.total;
-    var premiere = true;
-    for (final l in o.lignes) {
-      lignes.add(_Ligne('ligne', _hauteurTexte(l.produit), cells: [
-        premiere ? formatDate(o.date) : '',
-        premiere ? o.numero : '',
-        l.produit,
-        l.quantite.toString(),
-        formatMontant(l.montant),
-      ]));
-      premiere = false;
-    }
-    if (o.lignes.isEmpty) {
-      lignes.add(_Ligne('ligne', 20, cells: [formatDate(o.date), o.numero, '', '', '0']));
-    }
+    groupes[o.enfant]!.add(o);
   }
-  clore();
+
+  final lignes = <_U>[];
+  for (final e in enfants) {
+    lignes.add(_U('bandeau', 22, keep: true, texte: e));
+    var totEnfant = 0;
+    for (final o in groupes[e]!) {
+      totEnfant += o.total;
+      lignes.add(_U('ord', _hauteurProduits(o) + _ecartOrd, ord: o, dateKey: '$e|${formatDate(o.date)}', numero: numeros[o.id] ?? 0));
+    }
+    lignes.last.keep = true;
+    lignes.add(_U('totalEnfant', 22, texte: 'TOTAL $e : ${formatMontant(totEnfant)} FCFA'));
+  }
 
   // Hauteur du bloc final.
-  final phrase = 'Arrêtée la présente facture à la somme de : $lettres.';
-  final lignesPhrase = (phrase.length + 69) ~/ 70;
-  final motsH = lignesPhrase * 15.0 + 8;
+  final motsH = hauteurMontantEnLettres(lettres);
   const sigH = 80.0;
   const totalGenH = 32.0;
   final fin = totalGenH + 14 + motsH + 14 + sigH + 6;
@@ -152,7 +149,7 @@ Future<Uint8List> genererPdfOrdonnances({
 
   final contenuQr = [
     numero,
-    for (final o in tri) '${o.enfant}/${o.numero}/${formatDate(o.date)}/${o.total}',
+    for (final o in tri) '${o.enfant}/${numeros[o.id]}/${formatDate(o.date)}/${o.total}',
   ].join(';');
   final code = empreinte('$contenuQr;$total');
   final qrData = 'ADUA | ORDONNANCES | $numero | ${formatMontant(total)} FCFA | '
@@ -219,39 +216,122 @@ Future<Uint8List> genererPdfOrdonnances({
         fond: PdfColors.grey200,
       );
 
-  pw.Widget ligne(_Ligne l) {
-    switch (l.type) {
-      case 'bandeau':
-        return enveloppe(
-          l.h,
-          pw.Container(
-            alignment: pw.Alignment.centerLeft,
-            padding: const pw.EdgeInsets.symmetric(horizontal: 3),
-            child: pw.Text(l.texte, style: _st(gras)),
-          ),
-          fond: PdfColors.grey300,
-        );
-      case 'totalEnfant':
-        return enveloppe(
-          l.h,
-          pw.Container(
-            alignment: pw.Alignment.centerRight,
-            padding: const pw.EdgeInsets.symmetric(horizontal: 3),
-            child: pw.Text(l.texte, style: _st(gras)),
-          ),
-        );
-      default:
-        return enveloppe(
-          l.h,
-          pw.Row(children: [
-            cellule(l.cells[0], _wDate, h: l.h),
-            cellule(l.cells[1], _wNum, h: l.h),
-            cellule(l.cells[2], _wProd, h: l.h),
-            cellule(l.cells[3], _wQte, al: pw.Alignment.centerRight, h: l.h),
-            cellule(l.cells[4], _wMont, last: true, al: pw.Alignment.centerRight, h: l.h),
-          ]),
-        );
+  pw.Widget ligne(_U l) {
+    if (l.type == 'bandeau') {
+      return enveloppe(
+        l.h,
+        pw.Container(
+          alignment: pw.Alignment.centerLeft,
+          padding: const pw.EdgeInsets.symmetric(horizontal: 3),
+          child: pw.Text(l.texte, style: _st(gras)),
+        ),
+        fond: PdfColors.grey300,
+      );
     }
+    return enveloppe(
+      l.h,
+      pw.Container(
+        alignment: pw.Alignment.centerRight,
+        padding: const pw.EdgeInsets.symmetric(horizontal: 3),
+        child: pw.Text(l.texte, style: _st(gras)),
+      ),
+    );
+  }
+
+  const bordBas = pw.BoxDecoration(border: pw.Border(bottom: pw.BorderSide(width: 0.6)));
+  const bordDroite = pw.BoxDecoration(border: pw.Border(right: pw.BorderSide(width: 0.6)));
+  const bordDroiteBas =
+      pw.BoxDecoration(border: pw.Border(right: pw.BorderSide(width: 0.6), bottom: pw.BorderSide(width: 0.6)));
+
+  // Une ordonnance : cellule du numéro fusionnée sur toutes ses lignes de produits.
+  pw.Widget blocOrd(_U u) {
+    final o = u.ord!;
+    final reste = _largeur - _wDate - _wNum;
+    final produits = <pw.Widget>[];
+    if (o.lignes.isEmpty) {
+      produits.add(pw.SizedBox(width: reste, height: u.h - _ecartOrd));
+    }
+    for (var k = 0; k < o.lignes.length; k++) {
+      final l = o.lignes[k];
+      final h = _hauteurTexte(l.produit);
+      produits.add(pw.Container(
+        width: reste,
+        height: h,
+        decoration: k == o.lignes.length - 1 ? null : bordBas,
+        child: pw.Row(children: [
+          cellule(l.produit, _wProd, h: h),
+          cellule(l.quantite.toString(), _wQte, al: pw.Alignment.centerRight, h: h),
+          cellule(formatMontant(l.montant), _wMont, last: true, al: pw.Alignment.centerRight, h: h),
+        ]),
+      ));
+    }
+    final hp = u.h - _ecartOrd;
+    return pw.Column(children: [
+      pw.Container(
+        width: _largeur - _wDate,
+        height: hp,
+        decoration: bordBas,
+        child: pw.Row(children: [
+          pw.Container(
+            width: _wNum,
+            height: hp,
+            alignment: pw.Alignment.center,
+            decoration: bordDroite,
+            child: pw.Text('${u.numero}', style: _st(normal)),
+          ),
+          pw.Column(children: produits),
+        ]),
+      ),
+      // Deuxième trait, juste sous le premier : séparation visible entre deux ordonnances.
+      pw.Container(
+        width: _largeur - _wDate,
+        height: _ecartOrd,
+        decoration: bordBas,
+        child: pw.Row(children: [
+          pw.Container(width: _wNum, height: _ecartOrd, decoration: bordDroite),
+          pw.Container(width: _wProd, height: _ecartOrd, decoration: bordDroite),
+          pw.Container(width: _wQte, height: _ecartOrd, decoration: bordDroite),
+        ]),
+      ),
+    ]);
+  }
+
+  // Une date : cellule fusionnée sur toutes les ordonnances consécutives de cette date.
+  pw.Widget blocDate(List<_U> l) {
+    var h = 0.0;
+    for (final u in l) {
+      h += u.h;
+    }
+    return pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
+      pw.Container(
+        width: _wDate,
+        height: h,
+        alignment: pw.Alignment.center,
+        decoration: bordDroiteBas,
+        child: pw.Text(formatDate(l.first.ord!.date), style: _st(normal)),
+      ),
+      pw.Column(children: [for (final u in l) blocOrd(u)]),
+    ]);
+  }
+
+  List<pw.Widget> contenuPage(List<int> idx) {
+    final w = <pw.Widget>[];
+    var i = 0;
+    while (i < idx.length) {
+      final u = lignes[idx[i]];
+      if (u.type != 'ord') {
+        w.add(ligne(u));
+        i++;
+        continue;
+      }
+      var j = i;
+      while (j < idx.length && lignes[idx[j]].type == 'ord' && lignes[idx[j]].dateKey == u.dateKey) {
+        j++;
+      }
+      w.add(blocDate([for (var k = i; k < j; k++) lignes[idx[k]]]));
+      i = j;
+    }
+    return w;
   }
 
   // Double cadre : un cadre épais extérieur, un cadre fin intérieur.
@@ -268,10 +348,7 @@ Future<Uint8List> genererPdfOrdonnances({
 
   pw.Widget bas() => pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
         pw.SizedBox(height: 14),
-        pw.SizedBox(
-          height: motsH,
-          child: pw.Text(phrase, style: _st(normal)),
-        ),
+        blocMontantEnLettres(lettres: lettres, normal: normal, grasItalique: grasItalique, largeur: _largeur),
         pw.SizedBox(height: 14),
         pw.SizedBox(
           height: sigH,
@@ -298,7 +375,7 @@ Future<Uint8List> genererPdfOrdonnances({
       if (p == 0) entete(),
       cadre([
         titresColonnes(),
-        for (final i in pages[p]) ligne(lignes[i]),
+        ...contenuPage(pages[p]),
         if (derniere)
           pw.Container(
             height: totalGenH,
