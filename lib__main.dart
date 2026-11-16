@@ -21,8 +21,15 @@ class FacturationAduaApp extends StatelessWidget {
       title: 'FACTURATION ADUA',
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
-        colorSchemeSeed: const Color(0xFF1B5E20),
+        colorSchemeSeed: const Color(0xFF0B6E4F),
         useMaterial3: true,
+        appBarTheme: const AppBarTheme(centerTitle: true),
+        inputDecorationTheme: InputDecorationTheme(
+          border: OutlineInputBorder(borderRadius: BorderRadius.circular(12)),
+        ),
+        filledButtonTheme: FilledButtonThemeData(
+          style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
+        ),
       ),
       home: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),

@@ -62,10 +62,15 @@ class _LoginScreenState extends State<LoginScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  const Icon(Icons.receipt_long, size: 64),
-                  const SizedBox(height: 8),
+                  Center(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(24),
+                      child: Image.asset('assets/icone.png', width: 110, height: 110),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
                   const Text('FACTURATION ADUA',
-                      textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                      textAlign: TextAlign.center, style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold, letterSpacing: 0.5)),
                   const SizedBox(height: 4),
                   Text(premier ? 'Premier lancement : créez le compte administrateur principal.' : 'Connexion',
                       textAlign: TextAlign.center),

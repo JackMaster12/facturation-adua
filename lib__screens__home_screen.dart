@@ -40,57 +40,129 @@ class HomeScreen extends StatelessWidget {
           );
         }
 
-        void bientot(String nom) => ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text('$nom : prévu aux phases suivantes.')));
+        void aller(Widget ecran) => Navigator.push(context, MaterialPageRoute(builder: (_) => ecran));
 
-        final boutons = <_Bouton>[
-          _Bouton('Nouvelle facture sur ordonnances enfants', Icons.add_circle_outline, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen()))),
-          _Bouton('Facture en cours : ordonnances enfants', Icons.child_care, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen()))),
-          _Bouton('Nouvelle facture sur commande', Icons.add_box_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const NouvelleFactureScreen(type: 'commandes')))),
-          _Bouton('Facture en cours : sur commande', Icons.local_shipping_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const FacturesEnCoursScreen(type: 'commandes')))),
-          _Bouton('Factures terminées', Icons.task_alt, () => Navigator.push(context, MaterialPageRoute(builder: (_) => FacturesTermineesScreen(profil: p)))),
-          _Bouton('Générer un rapport', Icons.summarize_outlined, () => Navigator.push(context, MaterialPageRoute(builder: (_) => const RapportGenereScreen()))),
-          _Bouton('Rédiger un rapport', Icons.edit_note, () => Navigator.push(context, MaterialPageRoute(builder: (_) => RapportsEcritsScreen(profil: p)))),
-          _Bouton('Base de données', Icons.storage_outlined,
-              () => Navigator.push(context, MaterialPageRoute(builder: (_) => BaseDonneesScreen(profil: p)))),
-          if (p.isAdmin)
-            _Bouton('Administration', Icons.admin_panel_settings_outlined,
-                () => Navigator.push(context, MaterialPageRoute(builder: (_) => const AdminScreen()))),
+        final sections = <_Section>[
+          _Section('Ordonnances enfants', [
+            _Bouton('Nouvelle facture', Icons.add_circle_outline, () => aller(const NouvelleFactureScreen())),
+            _Bouton('Facture en cours', Icons.child_care, () => aller(const FacturesEnCoursScreen())),
+          ]),
+          _Section('Factures sur commande', [
+            _Bouton('Nouvelle facture', Icons.add_box_outlined,
+                () => aller(const NouvelleFactureScreen(type: 'commandes'))),
+            _Bouton('Facture en cours', Icons.local_shipping_outlined,
+                () => aller(const FacturesEnCoursScreen(type: 'commandes'))),
+          ]),
+          _Section('Documents', [
+            _Bouton('Factures terminées', Icons.task_alt, () => aller(FacturesTermineesScreen(profil: p))),
+            _Bouton('Générer un rapport', Icons.summarize_outlined, () => aller(const RapportGenereScreen())),
+            _Bouton('Rédiger un rapport', Icons.edit_note, () => aller(RapportsEcritsScreen(profil: p))),
+          ]),
+          _Section('Données', [
+            _Bouton('Base de données', Icons.storage_outlined, () => aller(BaseDonneesScreen(profil: p))),
+            if (p.isAdmin) _Bouton('Administration', Icons.admin_panel_settings_outlined, () => aller(const AdminScreen())),
+          ]),
         ];
 
+        final couleurs = Theme.of(context).colorScheme;
         return Scaffold(
-          appBar: AppBar(
-            title: const Text('FACTURATION ADUA'),
-            actions: [
-              IconButton(
-                tooltip: 'Se déconnecter',
-                icon: const Icon(Icons.logout),
-                onPressed: AuthService.instance.signOut,
-              ),
-            ],
-          ),
-          body: ListView(
-            padding: const EdgeInsets.all(16),
-            children: [
-              Text('Bonjour ${p.nom}', style: Theme.of(context).textTheme.titleMedium),
-              const SizedBox(height: 12),
-              for (final b in boutons)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 10),
-                  child: FilledButton.tonalIcon(
-                    style: FilledButton.styleFrom(
-                      alignment: Alignment.centerLeft,
-                      padding: const EdgeInsets.symmetric(vertical: 18, horizontal: 16),
+          body: SafeArea(
+            child: ListView(
+              padding: const EdgeInsets.fromLTRB(16, 12, 16, 24),
+              children: [
+                // En-tête : logo, nom de l'application, utilisateur connecté
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [couleurs.primary, couleurs.primary.withValues(alpha: 0.78)],
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
                     ),
-                    onPressed: b.action,
-                    icon: Icon(b.icon),
-                    label: Text(b.titre, style: const TextStyle(fontSize: 16)),
+                    borderRadius: BorderRadius.circular(20),
                   ),
+                  child: Row(children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(14),
+                      child: Image.asset('assets/icone.png', width: 64, height: 64),
+                    ),
+                    const SizedBox(width: 14),
+                    Expanded(
+                      child: Column(crossAxisAlignment: CrossAxisAlignment.start, children: [
+                        Text('FACTURATION ADUA',
+                            style: TextStyle(color: couleurs.onPrimary, fontSize: 19, fontWeight: FontWeight.bold)),
+                        const SizedBox(height: 2),
+                        Text('Bonjour ${p.nom}',
+                            style: TextStyle(color: couleurs.onPrimary.withValues(alpha: 0.9), fontSize: 14)),
+                        Text(p.isAdmin ? 'Administrateur' : 'Utilisateur',
+                            style: TextStyle(color: couleurs.onPrimary.withValues(alpha: 0.75), fontSize: 12)),
+                      ]),
+                    ),
+                    IconButton(
+                      tooltip: 'Se déconnecter',
+                      icon: Icon(Icons.logout, color: couleurs.onPrimary),
+                      onPressed: AuthService.instance.signOut,
+                    ),
+                  ]),
                 ),
-            ],
+                for (final s in sections) ...[
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
+                    child: Text(s.titre,
+                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: couleurs.primary)),
+                  ),
+                  GridView.count(
+                    crossAxisCount: 2,
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    mainAxisSpacing: 10,
+                    crossAxisSpacing: 10,
+                    childAspectRatio: 1.3,
+                    children: [for (final b in s.boutons) _Carte(b)],
+                  ),
+                ],
+              ],
+            ),
           ),
         );
       },
+    );
+  }
+}
+
+class _Section {
+  _Section(this.titre, this.boutons);
+  final String titre;
+  final List<_Bouton> boutons;
+}
+
+class _Carte extends StatelessWidget {
+  const _Carte(this.b);
+  final _Bouton b;
+
+  @override
+  Widget build(BuildContext context) {
+    final c = Theme.of(context).colorScheme;
+    return Card(
+      elevation: 0,
+      color: c.secondaryContainer.withValues(alpha: 0.55),
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
+      clipBehavior: Clip.antiAlias,
+      child: InkWell(
+        onTap: b.action,
+        child: Padding(
+          padding: const EdgeInsets.all(12),
+          child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
+            CircleAvatar(
+              radius: 24,
+              backgroundColor: c.primary,
+              child: Icon(b.icon, color: c.onPrimary),
+            ),
+            const SizedBox(height: 10),
+            Text(b.titre, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
+          ]),
+        ),
+      ),
     );
   }
 }
