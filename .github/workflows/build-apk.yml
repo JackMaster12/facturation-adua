@@ -44,6 +44,10 @@ jobs:
           mkdir -p ~/.android
           if [ -f debug.keystore ]; then cp debug.keystore ~/.android/debug.keystore; fi
       - run: flutter pub get
+            - name: Icône et nom de l'application
+        run: |
+          dart run flutter_launcher_icons
+          sed -i 's/android:label="[^"]*"/android:label="Facturation ADUA"/' android/app/src/main/AndroidManifest.xml
       - run: flutter test
       - run: flutter build apk --release --split-per-abi
       - name: Publier l'APK dans une Release
