@@ -3,6 +3,8 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../core/noms.dart';
+
 /// Champ qui ouvre une liste (enfants ou produits) avec recherche et ajout d'un nouveau nom.
 class SelecteurNom extends StatelessWidget {
   const SelecteurNom({
@@ -56,9 +58,15 @@ class _FeuilleState extends State<_Feuille> {
     super.dispose();
   }
 
-  void _ajouter(String nom) {
-    final n = nom.trim();
+  void _ajouter(String nom, List<String> existants) {
+    final n = nom.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (n.isEmpty) return;
+    // Un nom déjà présent (accents, majuscules, espaces ignorés) est simplement choisi, jamais recréé.
+    final deja = existants.where((e) => cleNom(e) == cleNom(n));
+    if (deja.isNotEmpty) {
+      Navigator.pop(context, deja.first);
+      return;
+    }
     unawaited(FirebaseFirestore.instance
         .collection(widget.collection)
         .add({'nom': n, 'creeLe': FieldValue.serverTimestamp()}).then((_) {}, onError: (_) {}));
@@ -87,18 +95,19 @@ class _FeuilleState extends State<_Feuille> {
               stream: FirebaseFirestore.instance.collection(widget.collection).snapshots(),
               builder: (context, snap) {
                 final q = _q.text.trim().toLowerCase();
+                final cq = cleNom(_q.text);
                 final noms = <String>[
                   for (final d in snap.data?.docs ?? <QueryDocumentSnapshot<Map<String, dynamic>>>[])
                     (d.data()['nom'] ?? '') as String,
                 ]..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
-                final filtres = noms.where((n) => n.toLowerCase().contains(q)).toList();
-                final existe = noms.any((n) => n.toLowerCase() == q);
+                final filtres = noms.where((n) => n.toLowerCase().contains(q) || cleNom(n).contains(cq)).toList();
+                final existe = noms.any((n) => cleNom(n) == cq);
                 return ListView(children: [
                   if (q.isNotEmpty && !existe)
                     ListTile(
                       leading: const Icon(Icons.add),
                       title: Text('Ajouter « ${_q.text.trim()} »'),
-                      onTap: () => _ajouter(_q.text),
+                      onTap: () => _ajouter(_q.text, noms),
                     ),
                   for (final n in filtres) ListTile(title: Text(n), onTap: () => Navigator.pop(context, n)),
                 ]);

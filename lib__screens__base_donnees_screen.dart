@@ -1,6 +1,10 @@
+import 'dart:async';
+
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 
+import '../core/noms.dart';
+import '../data/produits_courants.dart';
 import '../services/auth_service.dart';
 import '../services/unites_service.dart';
 
@@ -75,13 +79,113 @@ class _ListeNomsState extends State<_ListeNoms> {
         ],
       ),
     );
-    final nom = c.text.trim();
+    final nom = c.text.replaceAll(RegExp(r'\s+'), ' ').trim();
     if (ok != true || nom.isEmpty) return;
+    // Refuser un nom déjà présent (majuscules, accents et espaces ignorés).
+    try {
+      final existants = await _col.get().timeout(const Duration(seconds: 6));
+      final cle = cleNom(nom);
+      final doublon = existants.docs.any((d) => d.id != doc?.id && cleNom((d.data()[widget.champ] ?? '') as String) == cle);
+      if (doublon) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text('« $nom » existe déjà dans la liste.')));
+        }
+        return;
+      }
+    } catch (_) {}
     if (doc == null) {
-      await _col.add({widget.champ: nom, 'creeLe': FieldValue.serverTimestamp()});
+      unawaited(_col.add({widget.champ: nom, 'creeLe': FieldValue.serverTimestamp()}).then((_) {}, onError: (_) {}));
     } else {
-      await doc.reference.update({widget.champ: nom});
+      unawaited(doc.reference.update({widget.champ: nom}).catchError((_) {}));
     }
+  }
+
+  /// Colle une liste (un nom par ligne) : ajoute tout d'un coup, sans doublons.
+  Future<void> _importer() async {
+    final c = TextEditingController();
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Ajouter plusieurs'),
+        content: SizedBox(
+          width: double.maxFinite,
+          child: TextField(
+            controller: c,
+            autofocus: true,
+            minLines: 8,
+            maxLines: 12,
+            keyboardType: TextInputType.multiline,
+            decoration: InputDecoration(
+              labelText: widget.libelle,
+              hintText: 'Un nom par ligne.\nCollez ici votre liste.',
+              border: const OutlineInputBorder(),
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ajouter')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final saisis = <String>[];
+    final vus = <String>{};
+    for (final ligne in c.text.split('\n')) {
+      final nom = ligne.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (nom.isEmpty || !vus.add(cleNom(nom))) continue;
+      saisis.add(nom);
+    }
+    if (saisis.isEmpty) return;
+    await _ajouterNoms(saisis);
+  }
+
+  /// Ajoute les noms qui ne sont pas déjà dans la liste (doublons ignorés).
+  Future<void> _ajouterNoms(List<String> saisis) async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final existants = <String>{};
+      final s = await _col.get().timeout(const Duration(seconds: 8));
+      for (final d in s.docs) {
+        existants.add(cleNom((d.data()[widget.champ] ?? '') as String));
+      }
+      final nouveaux = <String>[];
+      final vus = <String>{};
+      for (final n in saisis) {
+        final k = cleNom(n);
+        if (existants.contains(k) || !vus.add(k)) continue;
+        nouveaux.add(n);
+      }
+      for (var i = 0; i < nouveaux.length; i += 400) {
+        final batch = FirebaseFirestore.instance.batch();
+        for (final nom in nouveaux.skip(i).take(400)) {
+          batch.set(_col.doc(), {widget.champ: nom, 'creeLe': FieldValue.serverTimestamp()});
+        }
+        unawaited(batch.commit().catchError((_) {}));
+      }
+      messenger.showSnackBar(SnackBar(
+          content: Text('${nouveaux.length} ajouté(s)'
+              '${saisis.length > nouveaux.length ? ', ${saisis.length - nouveaux.length} déjà présent(s)' : ''}.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Ajout impossible : $e')));
+    }
+  }
+
+  Future<void> _ajouterCourants() async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Produits courants'),
+        content: Text('Ajouter ${produitsCourants.length} produits pharmaceutiques courants (médicaments, '
+            'perfusions, consommables) ? Les noms déjà présents seront ignorés. '
+            'Vous pourrez ensuite en corriger ou en ajouter.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Ajouter')),
+        ],
+      ),
+    );
+    if (ok == true) await _ajouterNoms(produitsCourants);
   }
 
   Future<void> _supprimer(DocumentSnapshot<Map<String, dynamic>> doc) async {
@@ -97,7 +201,7 @@ class _ListeNomsState extends State<_ListeNoms> {
         ],
       ),
     );
-    if (ok == true) await doc.reference.delete();
+    if (ok == true) unawaited(doc.reference.delete().catchError((_) {}));
   }
 
   @override
@@ -119,6 +223,29 @@ class _ListeNomsState extends State<_ListeNoms> {
               prefixIcon: Icon(Icons.search), hintText: 'Rechercher', border: OutlineInputBorder()),
           ),
         ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 4),
+            child: TextButton.icon(
+              onPressed: _importer,
+              icon: const Icon(Icons.playlist_add),
+              label: const Text('Ajouter plusieurs (coller une liste)'),
+            ),
+          ),
+        ),
+        if (widget.collection == 'produits')
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 4),
+              child: TextButton.icon(
+                onPressed: _ajouterCourants,
+                icon: const Icon(Icons.inventory_2_outlined),
+                label: Text('Ajouter les ${produitsCourants.length} produits courants'),
+              ),
+            ),
+          ),
         Expanded(
           child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
             stream: _col.orderBy(widget.champ).snapshots(),

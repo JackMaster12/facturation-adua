@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/auth_service.dart';
 import 'admin_screen.dart';
+import 'apprendre_screen.dart';
 import 'base_donnees_screen.dart';
 import 'factures_en_cours_screen.dart';
 import 'factures_terminees_screen.dart';
@@ -43,23 +44,24 @@ class HomeScreen extends StatelessWidget {
         void aller(Widget ecran) => Navigator.push(context, MaterialPageRoute(builder: (_) => ecran));
 
         final sections = <_Section>[
-          _Section('Ordonnances enfants', [
+          _Section('Ordonnances enfants', const Color(0xFF0B6E4F), [
             _Bouton('Nouvelle facture', Icons.add_circle_outline, () => aller(const NouvelleFactureScreen())),
             _Bouton('Facture en cours', Icons.child_care, () => aller(const FacturesEnCoursScreen())),
           ]),
-          _Section('Factures sur commande', [
+          _Section('Factures sur commande', const Color(0xFF1565C0), [
             _Bouton('Nouvelle facture', Icons.add_box_outlined,
                 () => aller(const NouvelleFactureScreen(type: 'commandes'))),
             _Bouton('Facture en cours', Icons.local_shipping_outlined,
                 () => aller(const FacturesEnCoursScreen(type: 'commandes'))),
           ]),
-          _Section('Documents', [
+          _Section('Documents', const Color(0xFFEF6C00), [
             _Bouton('Factures terminées', Icons.task_alt, () => aller(FacturesTermineesScreen(profil: p))),
             _Bouton('Générer un rapport', Icons.summarize_outlined, () => aller(const RapportGenereScreen())),
             _Bouton('Rédiger un rapport', Icons.edit_note, () => aller(RapportsEcritsScreen(profil: p))),
           ]),
-          _Section('Données', [
+          _Section('Données et formation', const Color(0xFF6A1B9A), [
             _Bouton('Base de données', Icons.storage_outlined, () => aller(BaseDonneesScreen(profil: p))),
+            _Bouton('Apprendre', Icons.menu_book_outlined, () => aller(const ApprendreScreen())),
             if (p.isAdmin) _Bouton('Administration', Icons.admin_panel_settings_outlined, () => aller(const AdminScreen())),
           ]),
         ];
@@ -107,9 +109,15 @@ class HomeScreen extends StatelessWidget {
                 ),
                 for (final s in sections) ...[
                   Padding(
-                    padding: const EdgeInsets.fromLTRB(4, 20, 4, 8),
-                    child: Text(s.titre,
-                        style: TextStyle(fontSize: 15, fontWeight: FontWeight.w700, color: couleurs.primary)),
+                    padding: const EdgeInsets.fromLTRB(0, 20, 0, 8),
+                    child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 9),
+                      decoration: BoxDecoration(color: s.couleur, borderRadius: BorderRadius.circular(12)),
+                      child: Text(s.titre,
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(fontSize: 15.5, fontWeight: FontWeight.bold, color: Colors.white)),
+                    ),
                   ),
                   GridView.count(
                     crossAxisCount: 2,
@@ -118,7 +126,7 @@ class HomeScreen extends StatelessWidget {
                     mainAxisSpacing: 10,
                     crossAxisSpacing: 10,
                     childAspectRatio: 1.3,
-                    children: [for (final b in s.boutons) _Carte(b)],
+                    children: [for (final b in s.boutons) _Carte(b, s.couleur)],
                   ),
                 ],
               ],
@@ -131,21 +139,22 @@ class HomeScreen extends StatelessWidget {
 }
 
 class _Section {
-  _Section(this.titre, this.boutons);
+  _Section(this.titre, this.couleur, this.boutons);
   final String titre;
+  final Color couleur;
   final List<_Bouton> boutons;
 }
 
 class _Carte extends StatelessWidget {
-  const _Carte(this.b);
+  const _Carte(this.b, this.couleur);
   final _Bouton b;
+  final Color couleur;
 
   @override
   Widget build(BuildContext context) {
-    final c = Theme.of(context).colorScheme;
     return Card(
       elevation: 0,
-      color: c.secondaryContainer.withValues(alpha: 0.55),
+      color: couleur.withValues(alpha: 0.12),
       shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(18)),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -155,8 +164,8 @@ class _Carte extends StatelessWidget {
           child: Column(mainAxisAlignment: MainAxisAlignment.center, children: [
             CircleAvatar(
               radius: 24,
-              backgroundColor: c.primary,
-              child: Icon(b.icon, color: c.onPrimary),
+              backgroundColor: couleur,
+              child: Icon(b.icon, color: Colors.white),
             ),
             const SizedBox(height: 10),
             Text(b.titre, textAlign: TextAlign.center, style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
