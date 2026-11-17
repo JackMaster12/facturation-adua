@@ -58,6 +58,9 @@ class _ListeNoms extends StatefulWidget {
 
 class _ListeNomsState extends State<_ListeNoms> {
   final _recherche = TextEditingController();
+  bool _selectionActive = false;
+  final Set<String> _selection = {};
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> _visibles = [];
 
   CollectionReference<Map<String, dynamic>> get _col => FirebaseFirestore.instance.collection(widget.collection);
 
@@ -188,6 +191,41 @@ class _ListeNomsState extends State<_ListeNoms> {
     if (ok == true) await _ajouterNoms(produitsCourants);
   }
 
+  void _quitterSelection() => setState(() {
+        _selectionActive = false;
+        _selection.clear();
+      });
+
+  /// Supprime d'un coup tous les éléments cochés (administrateur seulement).
+  Future<void> _supprimerSelection() async {
+    final n = _selection.length;
+    if (n == 0) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Supprimer la sélection ?'),
+        content: Text('$n élément(s) seront supprimés de la liste. '
+            'Les factures déjà saisies ne changent pas. Cette action est définitive.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: Text('Supprimer ($n)')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    final messenger = ScaffoldMessenger.of(context);
+    final ids = _selection.toList();
+    for (var i = 0; i < ids.length; i += 400) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final id in ids.skip(i).take(400)) {
+        batch.delete(_col.doc(id));
+      }
+      unawaited(batch.commit().catchError((_) {}));
+    }
+    _quitterSelection();
+    messenger.showSnackBar(SnackBar(content: Text('$n supprimé(s).')));
+  }
+
   Future<void> _supprimer(DocumentSnapshot<Map<String, dynamic>> doc) async {
     final nom = doc.data()?[widget.champ] ?? '';
     final ok = await showDialog<bool>(
@@ -214,6 +252,45 @@ class _ListeNomsState extends State<_ListeNoms> {
         label: const Text('Ajouter'),
       ),
       body: Column(children: [
+        if (admin)
+          _selectionActive
+              ? Container(
+                  color: Theme.of(context).colorScheme.secondaryContainer,
+                  padding: const EdgeInsets.symmetric(horizontal: 8),
+                  child: Row(children: [
+                    IconButton(icon: const Icon(Icons.close), tooltip: 'Quitter', onPressed: _quitterSelection),
+                    Expanded(child: Text('${_selection.length} sélectionné(s)')),
+                    TextButton(
+                      onPressed: () => setState(() {
+                        if (_selection.length >= _visibles.length) {
+                          _selection.clear();
+                        } else {
+                          _selection.addAll(_visibles.map((d) => d.id));
+                        }
+                      }),
+                      child: Text(_selection.length >= _visibles.length && _visibles.isNotEmpty
+                          ? 'Tout décocher'
+                          : 'Tout cocher'),
+                    ),
+                    IconButton(
+                      icon: const Icon(Icons.delete),
+                      color: Colors.red,
+                      tooltip: 'Supprimer la sélection',
+                      onPressed: _selection.isEmpty ? null : _supprimerSelection,
+                    ),
+                  ]),
+                )
+              : Align(
+                  alignment: Alignment.centerLeft,
+                  child: Padding(
+                    padding: const EdgeInsets.only(left: 12, top: 4),
+                    child: TextButton.icon(
+                      onPressed: () => setState(() => _selectionActive = true),
+                      icon: const Icon(Icons.checklist),
+                      label: const Text('Sélectionner et supprimer plusieurs'),
+                    ),
+                  ),
+                ),
         Padding(
           padding: const EdgeInsets.all(12),
           child: TextField(
@@ -256,6 +333,7 @@ class _ListeNomsState extends State<_ListeNoms> {
               final docs = snap.data!.docs
                   .where((d) => ((d.data()[widget.champ] ?? '') as String).toLowerCase().contains(q))
                   .toList();
+              _visibles = docs;
               if (docs.isEmpty) return const Center(child: Text('Aucun élément.'));
               return ListView.separated(
                 padding: const EdgeInsets.only(bottom: 90),
@@ -263,6 +341,13 @@ class _ListeNomsState extends State<_ListeNoms> {
                 separatorBuilder: (_, __) => const Divider(height: 1),
                 itemBuilder: (_, i) {
                   final d = docs[i];
+                  if (admin && _selectionActive) {
+                    return CheckboxListTile(
+                      value: _selection.contains(d.id),
+                      onChanged: (v) => setState(() => v == true ? _selection.add(d.id) : _selection.remove(d.id)),
+                      title: Text(d.data()[widget.champ] as String? ?? ''),
+                    );
+                  }
                   return ListTile(
                     title: Text(d.data()[widget.champ] as String? ?? ''),
                     trailing: admin
