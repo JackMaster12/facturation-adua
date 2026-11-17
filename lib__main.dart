@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'firebase_options.dart';
 import 'screens/home_screen.dart';
 import 'screens/login_screen.dart';
+import 'screens/splash_screen.dart';
 
 Future<void> main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -31,7 +32,8 @@ class FacturationAduaApp extends StatelessWidget {
           style: FilledButton.styleFrom(shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12))),
         ),
       ),
-      home: StreamBuilder<User?>(
+      home: EcranDemarrage(
+        suite: StreamBuilder<User?>(
         stream: FirebaseAuth.instance.authStateChanges(),
         builder: (context, snap) {
           if (snap.connectionState == ConnectionState.waiting) {
@@ -39,6 +41,7 @@ class FacturationAduaApp extends StatelessWidget {
           }
           return snap.data == null ? const LoginScreen() : const HomeScreen();
         },
+        ),
       ),
     );
   }
