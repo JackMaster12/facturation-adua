@@ -4,6 +4,7 @@ import '../core/dates.dart';
 import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../services/facture_service.dart';
+import '../widgets/a_revoir.dart';
 import '../widgets/selecteur_nom.dart';
 
 class _LigneEdit {
@@ -27,6 +28,8 @@ class OrdonnanceFormScreen extends StatefulWidget {
 class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
   late final TextEditingController _date;
   String _enfant = '';
+  bool _aRevoir = false;
+  final TextEditingController _note = TextEditingController();
   final List<_LigneEdit> _lignes = [];
 
   @override
@@ -35,6 +38,8 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
     final o = widget.ordonnance;
     _date = TextEditingController(text: formatDate(o?.date ?? DateTime.now()));
     _enfant = o?.enfant ?? '';
+    _aRevoir = o?.aRevoir ?? false;
+    _note.text = o?.noteRevoir ?? '';
     if (o != null) {
       for (final l in o.lignes) {
         _lignes.add(_LigneEdit(produit: l.produit, qte: '${l.quantite}', montant: '${l.montant}'));
@@ -61,7 +66,8 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
     }
     if (lignes.isEmpty) return _msg('Ajouter au moins un produit.');
     FactureService.instance
-        .enregistrerOrdonnance(widget.facture.id, widget.ordonnance?.id, d, _enfant, lignes);
+        .enregistrerOrdonnance(widget.facture.id, widget.ordonnance?.id, d, _enfant, lignes,
+            aRevoir: _aRevoir, note: _note.text);
     Navigator.pop(context);
   }
 
@@ -106,6 +112,8 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
           valeur: _enfant,
           onChoisi: (v) => setState(() => _enfant = v),
         ),
+        const SizedBox(height: 12),
+        ChampARevoir(valeur: _aRevoir, note: _note, onChange: (v) => setState(() => _aRevoir = v)),
         const SizedBox(height: 20),
         Text('Produits', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),

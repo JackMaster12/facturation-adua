@@ -5,6 +5,7 @@ import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../services/facture_service.dart';
 import '../services/unites_service.dart';
+import '../widgets/a_revoir.dart';
 import '../widgets/selecteur_nom.dart';
 
 class _LigneEdit {
@@ -29,6 +30,8 @@ class CommandeFormScreen extends StatefulWidget {
 class _CommandeFormScreenState extends State<CommandeFormScreen> {
   late final TextEditingController _date;
   late final TextEditingController _libelle;
+  bool _aRevoir = false;
+  final TextEditingController _note = TextEditingController();
   final List<_LigneEdit> _lignes = [];
 
   @override
@@ -37,6 +40,8 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
     final c = widget.commande;
     _date = TextEditingController(text: formatDate(c?.date ?? DateTime.now()));
     _libelle = TextEditingController(text: c?.libelle ?? '');
+    _aRevoir = c?.aRevoir ?? false;
+    _note.text = c?.noteRevoir ?? '';
     if (c != null) {
       for (final l in c.lignes) {
         _lignes.add(_LigneEdit(produit: l.produit, unite: l.unite, qte: '${l.quantite}', montant: '${l.montant}'));
@@ -73,7 +78,8 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
     }
     if (lignes.isEmpty) return _msg('Ajouter au moins un produit.');
     FactureService.instance
-        .enregistrerCommande(widget.facture.id, widget.commande?.id, d, _libelle.text.trim().toUpperCase(), lignes);
+        .enregistrerCommande(widget.facture.id, widget.commande?.id, d, _libelle.text.trim().toUpperCase(), lignes,
+            aRevoir: _aRevoir, note: _note.text);
     Navigator.pop(context);
   }
 
@@ -116,6 +122,8 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
           keyboardType: TextInputType.datetime,
           decoration: const InputDecoration(labelText: 'Date (JJ/MM/AAAA)', border: OutlineInputBorder()),
         ),
+        const SizedBox(height: 12),
+        ChampARevoir(valeur: _aRevoir, note: _note, onChange: (v) => setState(() => _aRevoir = v)),
         const SizedBox(height: 20),
         Text('Produits', style: Theme.of(context).textTheme.titleMedium),
         const SizedBox(height: 8),

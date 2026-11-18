@@ -4,6 +4,7 @@ import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../pdf/partage.dart';
 import '../services/facture_service.dart';
+import '../widgets/a_revoir.dart';
 import 'commande_form_screen.dart';
 
 class FactureCommandesScreen extends StatelessWidget {
@@ -17,6 +18,7 @@ class FactureCommandesScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Arrêter la facture ?'),
         content: Text('${cmds.length} commande(s), total ${formatMontant(total)} FCFA.\n\n'
+            '${cmds.where((c) => c.aRevoir).isEmpty ? '' : '⚠ ${cmds.where((c) => c.aRevoir).length} commande(s) sont encore marquées « à revoir ».\n\n'}'
             'Après l\'arrêt, plus aucune modification n\'est possible (sauf par l\'administrateur).'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
@@ -59,12 +61,16 @@ class FactureCommandesScreen extends StatelessWidget {
             return Scaffold(
               appBar: AppBar(title: Text('Commandes ${numeroFacture(f.mois, f.annee)}')),
               body: Column(children: [
+                bandeauNombreARevoir(cmds.where((c) => c.aRevoir).length),
                 Expanded(
                   child: cmds.isEmpty
                       ? const Center(child: Text('Aucune commande. Touchez « Nouvelle commande ».'))
                       : ListView(children: [
                           for (var i = 0; i < cmds.length; i++)
-                            ListTile(
+                            avecMarqueARevoir(
+                              aRevoir: cmds[i].aRevoir,
+                              note: cmds[i].noteRevoir,
+                              child: ListTile(
                               title: Text('SOUS-TOTAL ${i + 1} : ${cmds[i].libelle}'),
                               subtitle: Text('${formatDate(cmds[i].date)}  ·  '
                                   '${cmds[i].lignes.map((l) => l.produit).join(', ')}'),
@@ -75,7 +81,7 @@ class FactureCommandesScreen extends StatelessWidget {
                                       MaterialPageRoute(
                                           builder: (_) => CommandeFormScreen(facture: f, commande: cmds[i])))
                                   : null,
-                            ),
+                            )),
                         ]),
                 ),
                 Material(

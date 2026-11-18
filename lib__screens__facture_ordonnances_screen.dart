@@ -4,6 +4,7 @@ import '../core/format.dart';
 import '../models/ordonnance.dart';
 import '../pdf/partage.dart';
 import '../services/facture_service.dart';
+import '../widgets/a_revoir.dart';
 import 'ordonnance_form_screen.dart';
 
 class FactureOrdonnancesScreen extends StatelessWidget {
@@ -17,6 +18,7 @@ class FactureOrdonnancesScreen extends StatelessWidget {
       builder: (ctx) => AlertDialog(
         title: const Text('Arrêter la facture ?'),
         content: Text('${ords.length} ordonnance(s), total ${formatMontant(total)} FCFA.\n\n'
+            '${ords.where((o) => o.aRevoir).isEmpty ? '' : '⚠ ${ords.where((o) => o.aRevoir).length} ordonnance(s) sont encore marquées « à revoir ».\n\n'}'
             'Après l\'arrêt, plus aucune modification n\'est possible (sauf par l\'administrateur).'),
         actions: [
           TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
@@ -80,7 +82,10 @@ class FactureOrdonnancesScreen extends StatelessWidget {
                 ]),
               ));
               for (final o in l) {
-                items.add(ListTile(
+                items.add(avecMarqueARevoir(
+                  aRevoir: o.aRevoir,
+                  note: o.noteRevoir,
+                  child: ListTile(
                   title: Text('N° ${numeros[o.id]}  ·  ${formatDate(o.date)}'),
                   subtitle: Text(o.lignes.map((l) => '${l.produit} ×${l.quantite}').join(', ')),
                   trailing: Text(formatMontant(o.total)),
@@ -88,12 +93,13 @@ class FactureOrdonnancesScreen extends StatelessWidget {
                       ? () => Navigator.push(context,
                           MaterialPageRoute(builder: (_) => OrdonnanceFormScreen(facture: f, ordonnance: o)))
                       : null,
-                ));
+                )));
               }
             }
             return Scaffold(
               appBar: AppBar(title: Text('Facture ${numeroFacture(f.mois, f.annee)}')),
               body: Column(children: [
+                bandeauNombreARevoir(ords.where((o) => o.aRevoir).length),
                 Expanded(
                   child: ords.isEmpty
                       ? const Center(child: Text('Aucune ordonnance. Touchez « Nouvelle ordonnance ».'))

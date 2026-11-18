@@ -23,7 +23,11 @@ class OrdonnanceData {
     required this.enfant,
     required this.lignes,
     this.ordre = 0,
+    this.aRevoir = false,
+    this.noteRevoir = '',
   });
+  final bool aRevoir; // marquée « à revoir » par l'utilisateur
+  final String noteRevoir;
   final String id;
   final DateTime date;
   final String numero; // ancien champ saisi à la main (plus utilisé : la numérotation est automatique)
@@ -44,6 +48,8 @@ class OrdonnanceData {
       enfant: (m['enfant'] ?? '') as String,
       lignes: [for (final e in raw) LigneOrd.fromMap(Map<String, dynamic>.from(e as Map))],
       ordre: _lireOrdre(m),
+      aRevoir: m['aRevoir'] == true,
+      noteRevoir: (m['noteRevoir'] ?? '') as String,
     );
   }
 }
@@ -135,7 +141,17 @@ class LigneCmd {
 }
 
 class CommandeData {
-  CommandeData({required this.id, required this.libelle, required this.date, required this.lignes, this.ordre = 0});
+  CommandeData({
+    required this.id,
+    required this.libelle,
+    required this.date,
+    required this.lignes,
+    this.ordre = 0,
+    this.aRevoir = false,
+    this.noteRevoir = '',
+  });
+  final bool aRevoir;
+  final String noteRevoir;
   final int ordre; // ordre de saisie
   final String id;
   final String libelle;
@@ -154,6 +170,8 @@ class CommandeData {
       date: ts is Timestamp ? ts.toDate() : DateTime.now(),
       lignes: [for (final e in raw) LigneCmd.fromMap(Map<String, dynamic>.from(e as Map))],
       ordre: _lireOrdre(m),
+      aRevoir: m['aRevoir'] == true,
+      noteRevoir: (m['noteRevoir'] ?? '') as String,
     );
   }
 }

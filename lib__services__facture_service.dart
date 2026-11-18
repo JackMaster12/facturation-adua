@@ -66,12 +66,15 @@ class FactureService {
     return [for (final d in s.docs) OrdonnanceData.fromDoc(d)];
   }
 
-  void enregistrerOrdonnance(String factureId, String? ordId, DateTime date, String enfant, List<LigneOrd> lignes) {
+  void enregistrerOrdonnance(String factureId, String? ordId, DateTime date, String enfant, List<LigneOrd> lignes,
+      {bool aRevoir = false, String note = ''}) {
     final ref = ordId == null ? _ords(factureId).doc() : _ords(factureId).doc(ordId);
     final total = lignes.fold<int>(0, (s, l) => s + l.montant);
     final donnees = <String, dynamic>{
       'date': Timestamp.fromDate(date),
       'enfant': enfant,
+      'aRevoir': aRevoir,
+      'noteRevoir': aRevoir ? note.trim() : '',
       'lignes': [for (final l in lignes) l.toMap()],
       'total': total,
       'majLe': FieldValue.serverTimestamp(),
@@ -116,12 +119,15 @@ class FactureService {
     return trierCommandes([for (final d in s.docs) CommandeData.fromDoc(d)]);
   }
 
-  void enregistrerCommande(String factureId, String? cmdId, DateTime date, String libelle, List<LigneCmd> lignes) {
+  void enregistrerCommande(String factureId, String? cmdId, DateTime date, String libelle, List<LigneCmd> lignes,
+      {bool aRevoir = false, String note = ''}) {
     final ref = cmdId == null ? _cmds(factureId).doc() : _cmds(factureId).doc(cmdId);
     final total = lignes.fold<int>(0, (s, l) => s + l.montant);
     final donnees = <String, dynamic>{
       'date': Timestamp.fromDate(date),
       'libelle': libelle,
+      'aRevoir': aRevoir,
+      'noteRevoir': aRevoir ? note.trim() : '',
       'lignes': [for (final l in lignes) l.toMap()],
       'total': total,
       'majLe': FieldValue.serverTimestamp(),
