@@ -6,7 +6,8 @@ import 'package:flutter/material.dart';
 import '../core/noms.dart';
 
 /// Champ qui ouvre une liste (enfants ou produits) avec recherche et ajout d'un nouveau nom.
-class SelecteurNom extends StatelessWidget {
+/// `GlobalKey<SelecteurNomState>().currentState?.ouvrir()` ouvre la liste par programme.
+class SelecteurNom extends StatefulWidget {
   const SelecteurNom({
     super.key,
     required this.collection,
@@ -19,22 +20,29 @@ class SelecteurNom extends StatelessWidget {
   final String valeur;
   final ValueChanged<String> onChoisi;
 
-  Future<void> _ouvrir(BuildContext context) async {
+  @override
+  State<SelecteurNom> createState() => SelecteurNomState();
+}
+
+class SelecteurNomState extends State<SelecteurNom> {
+  Future<void> ouvrir() async {
+    if (!mounted) return;
     final r = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
-      builder: (_) => _Feuille(collection: collection, libelle: libelle),
+      builder: (_) => _Feuille(collection: widget.collection, libelle: widget.libelle),
     );
-    if (r != null && r.isNotEmpty) onChoisi(r);
+    if (r != null && r.isNotEmpty) widget.onChoisi(r);
   }
 
   @override
   Widget build(BuildContext context) {
     return InkWell(
-      onTap: () => _ouvrir(context),
+      onTap: ouvrir,
       child: InputDecorator(
-        decoration: InputDecoration(labelText: libelle, border: const OutlineInputBorder(), suffixIcon: const Icon(Icons.arrow_drop_down)),
-        child: Text(valeur.isEmpty ? 'Choisir…' : valeur),
+        decoration: InputDecoration(
+            labelText: widget.libelle, border: const OutlineInputBorder(), suffixIcon: const Icon(Icons.arrow_drop_down)),
+        child: Text(widget.valeur.isEmpty ? 'Choisir…' : widget.valeur),
       ),
     );
   }

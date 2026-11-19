@@ -62,17 +62,24 @@ int _lireOrdre(Map<String, dynamic> m) {
   return 0;
 }
 
-/// Ordonnances dans l'ordre de saisie : la première saisie en haut.
+/// Clé de tri par jour (l'heure éventuelle est ignorée).
+int _jour(DateTime d) => d.year * 10000 + d.month * 100 + d.day;
+
+/// Ordonnances par date croissante (du 1er au dernier jour du mois), quel que soit
+/// l'ordre de saisie. À date égale, l'ordre de saisie départage.
+/// Les enfants se placent selon leur ordonnance la plus ancienne.
 List<OrdonnanceData> trierOrdonnancesSaisie(Iterable<OrdonnanceData> l) {
   final r = [...l];
   r.sort((a, b) {
-    final c = a.ordre.compareTo(b.ordre);
+    var c = _jour(a.date).compareTo(_jour(b.date));
+    if (c != 0) return c;
+    c = a.ordre.compareTo(b.ordre);
     return c != 0 ? c : a.id.compareTo(b.id);
   });
   return r;
 }
 
-/// Numérotation automatique : 1, 2, 3… pour chaque enfant, dans l'ordre de saisie.
+/// Numérotation automatique : 1, 2, 3… pour chaque enfant, par date croissante.
 Map<String, int> numerosOrdonnances(Iterable<OrdonnanceData> l) {
   final par = <String, int>{};
   final res = <String, int>{};
@@ -176,11 +183,14 @@ class CommandeData {
   }
 }
 
-/// Les commandes sont numérotées (SOUS-TOTAL 1, 2, …) dans l'ordre de saisie : la première saisie en haut.
+/// Les commandes sont numérotées (SOUS-TOTAL 1, 2, …) par date croissante,
+/// quel que soit l'ordre de saisie. À date égale, l'ordre de saisie départage.
 List<CommandeData> trierCommandes(Iterable<CommandeData> l) {
   final r = [...l];
   r.sort((a, b) {
-    final c = a.ordre.compareTo(b.ordre);
+    var c = _jour(a.date).compareTo(_jour(b.date));
+    if (c != 0) return c;
+    c = a.ordre.compareTo(b.ordre);
     return c != 0 ? c : a.id.compareTo(b.id);
   });
   return r;

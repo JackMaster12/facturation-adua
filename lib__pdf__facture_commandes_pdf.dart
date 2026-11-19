@@ -44,6 +44,9 @@ Future<Uint8List> genererPdfCommandes({
   required DateTime arreteLe,
 }) async {
   final normal = pw.Font.helvetica();
+  // L'en-tête s'agrandit si le récepteur a des informations supplémentaires.
+  final nbInfos = recepteurInfosLignes.length;
+  final enteteH = _enteteH + (nbInfos > 2 ? (nbInfos - 2) * 14.0 : 0.0);
   final gras = pw.Font.helveticaBold();
   final grasItalique = pw.Font.helveticaBoldOblique();
   final numero = numeroFacture(facture.mois, facture.annee);
@@ -80,7 +83,7 @@ Future<Uint8List> genererPdfCommandes({
   final pages = paginer(
     [for (final l in lignes) l.h],
     [for (final l in lignes) l.keep],
-    _contenuH - _enteteH - 6,
+    _contenuH - enteteH - 6,
     _contenuH - _colH - 6, // place réservée pour répéter les titres de colonnes
     fin,
   );
@@ -128,7 +131,7 @@ Future<Uint8List> genererPdfCommandes({
       );
 
   pw.Widget entete() => pw.SizedBox(
-        height: _enteteH,
+        height: enteteH,
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             pw.Expanded(
@@ -139,6 +142,7 @@ Future<Uint8List> genererPdfCommandes({
                 pw.SizedBox(height: 10),
                 pw.Text('Récepteur : $recepteurNom', style: _st(gras)),
                 pw.Text('Adresse : $recepteurAdresse', style: _st(normal)),
+                for (final t in recepteurInfosLignes) pw.Text(t, style: _st(normal)),
               ]),
             ),
             pw.SizedBox(

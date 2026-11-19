@@ -16,6 +16,10 @@ class _LigneEdit {
   String unite;
   final TextEditingController qte;
   final TextEditingController montant;
+  final FocusNode fQte = FocusNode();
+  final FocusNode fMontant = FocusNode();
+  final GlobalKey<SelecteurNomState> cle = GlobalKey<SelecteurNomState>();
+  final GlobalKey<SelecteurNomState> cleUnite = GlobalKey<SelecteurNomState>();
 }
 
 class CommandeFormScreen extends StatefulWidget {
@@ -33,6 +37,23 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
   bool _aRevoir = false;
   final TextEditingController _note = TextEditingController();
   final List<_LigneEdit> _lignes = [];
+  final FocusNode _fDate = FocusNode();
+
+  void _apres(VoidCallback f) => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) f();
+      });
+
+  void _focusQte(_LigneEdit l) {
+    l.qte.selection = TextSelection(baseOffset: 0, extentOffset: l.qte.text.length);
+    l.fQte.requestFocus();
+  }
+
+  /// Nouvelle ligne de produit : la liste des produits s'ouvre aussitôt, prête pour la saisie.
+  void _nouvelleLigne() {
+    final l = _LigneEdit();
+    setState(() => _lignes.add(l));
+    _apres(() => l.cle.currentState?.ouvrir());
+  }
 
   @override
   void initState() {
@@ -113,13 +134,21 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
         TextField(
           controller: _libelle,
           textCapitalization: TextCapitalization.characters,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) => _fDate.requestFocus(),
           decoration: const InputDecoration(
               labelText: 'Libellé de la commande', hintText: 'ex. CONSOMMABLES', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         TextField(
           controller: _date,
+          focusNode: _fDate,
           keyboardType: TextInputType.datetime,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) {
+            final l = _lignes.first;
+            if (l.produit.isEmpty) l.cle.currentState?.ouvrir();
+          },
           decoration: const InputDecoration(labelText: 'Date (JJ/MM/AAAA)', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
@@ -135,10 +164,16 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                 Row(children: [
                   Expanded(
                     child: SelecteurNom(
+                      key: _lignes[i].cle,
                       collection: 'produits',
                       libelle: 'Produit',
                       valeur: _lignes[i].produit,
-                      onChoisi: (v) => setState(() => _lignes[i].produit = v),
+                      onChoisi: (v) {
+                        final l = _lignes[i];
+                        setState(() => l.produit = v);
+                        // Enchaînement : unité si elle est vide, sinon quantité.
+                        _apres(() => l.unite.isEmpty ? l.cleUnite.currentState?.ouvrir() : _focusQte(l));
+                      },
                     ),
                   ),
                   IconButton(
@@ -149,17 +184,25 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                 ]),
                 const SizedBox(height: 8),
                 SelecteurNom(
+                  key: _lignes[i].cleUnite,
                   collection: 'unites',
                   libelle: 'Unité',
                   valeur: _lignes[i].unite,
-                  onChoisi: (v) => setState(() => _lignes[i].unite = v),
+                  onChoisi: (v) {
+                    final l = _lignes[i];
+                    setState(() => l.unite = v);
+                    _apres(() => _focusQte(l));
+                  },
                 ),
                 const SizedBox(height: 8),
                 Row(children: [
                   Expanded(
                     child: TextField(
                       controller: _lignes[i].qte,
+                      focusNode: _lignes[i].fQte,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _lignes[i].fMontant.requestFocus(),
                       onChanged: (_) => setState(() {}),
                       decoration: const InputDecoration(labelText: 'Quantité', border: OutlineInputBorder()),
                     ),
@@ -168,8 +211,18 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                   Expanded(
                     child: TextField(
                       controller: _lignes[i].montant,
+                      focusNode: _lignes[i].fMontant,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
                       onChanged: (_) => setState(() {}),
+                      // Entrée : ligne suivante (nouveau produit) si le montant est rempli, sinon on ferme le clavier.
+                      onSubmitted: (_) {
+                        if (i == _lignes.length - 1 && parseEntier(_lignes[i].montant.text) > 0) {
+                          _nouvelleLigne();
+                        } else {
+                          FocusScope.of(context).unfocus();
+                        }
+                      },
                       decoration: const InputDecoration(labelText: 'Montant total (FCFA)', border: OutlineInputBorder()),
                     ),
                   ),
@@ -180,7 +233,7 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
             ),
           ),
         TextButton.icon(
-          onPressed: () => setState(() => _lignes.add(_LigneEdit())),
+          onPressed: _nouvelleLigne,
           icon: const Icon(Icons.add),
           label: const Text('Ajouter un produit'),
         ),

@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../core/noms.dart';
 import '../data/produits_courants.dart';
@@ -64,6 +65,15 @@ class _ListeNomsState extends State<_ListeNoms> {
 
   CollectionReference<Map<String, dynamic>> get _col => FirebaseFirestore.instance.collection(widget.collection);
 
+  /// Lit la liste : d'abord le téléphone (instantané, marche hors connexion), puis le serveur si le cache est vide.
+  Future<QuerySnapshot<Map<String, dynamic>>> _lireTout() async {
+    try {
+      final c = await _col.get(const GetOptions(source: Source.cache));
+      if (c.docs.isNotEmpty) return c;
+    } catch (_) {}
+    return _col.get().timeout(const Duration(seconds: 4));
+  }
+
   Future<void> _editer({DocumentSnapshot<Map<String, dynamic>>? doc}) async {
     final c = TextEditingController(text: doc?.data()?[widget.champ] as String? ?? '');
     final ok = await showDialog<bool>(
@@ -86,7 +96,7 @@ class _ListeNomsState extends State<_ListeNoms> {
     if (ok != true || nom.isEmpty) return;
     // Refuser un nom déjà présent (majuscules, accents et espaces ignorés).
     try {
-      final existants = await _col.get().timeout(const Duration(seconds: 6));
+      final existants = await _lireTout();
       final cle = cleNom(nom);
       final doublon = existants.docs.any((d) => d.id != doc?.id && cleNom((d.data()[widget.champ] ?? '') as String) == cle);
       if (doublon) {
@@ -106,23 +116,36 @@ class _ListeNomsState extends State<_ListeNoms> {
   /// Colle une liste (un nom par ligne) : ajoute tout d'un coup, sans doublons.
   Future<void> _importer() async {
     final c = TextEditingController();
+    var minuscules = widget.collection == 'produits';
     final ok = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('Ajouter plusieurs'),
-        content: SizedBox(
-          width: double.maxFinite,
-          child: TextField(
-            controller: c,
-            autofocus: true,
-            minLines: 8,
-            maxLines: 12,
-            keyboardType: TextInputType.multiline,
-            decoration: InputDecoration(
-              labelText: widget.libelle,
-              hintText: 'Un nom par ligne.\nCollez ici votre liste.',
-              border: const OutlineInputBorder(),
-            ),
+        content: StatefulBuilder(
+          builder: (ctx, setL) => SizedBox(
+            width: double.maxFinite,
+            child: Column(mainAxisSize: MainAxisSize.min, children: [
+              TextField(
+                controller: c,
+                autofocus: true,
+                minLines: 6,
+                maxLines: 10,
+                keyboardType: TextInputType.multiline,
+                decoration: InputDecoration(
+                  labelText: widget.libelle,
+                  hintText: 'Un nom par ligne.\nCollez ici votre liste.',
+                  border: const OutlineInputBorder(),
+                ),
+              ),
+              CheckboxListTile(
+                contentPadding: EdgeInsets.zero,
+                controlAffinity: ListTileControlAffinity.leading,
+                value: minuscules,
+                onChanged: (v) => setL(() => minuscules = v ?? false),
+                title: const Text('Écrire en minuscules, 1re lettre majuscule seulement'),
+                subtitle: const Text('PARACETAMOL 500 MG devient Paracetamol 500 mg'),
+              ),
+            ]),
           ),
         ),
         actions: [
@@ -135,7 +158,8 @@ class _ListeNomsState extends State<_ListeNoms> {
     final saisis = <String>[];
     final vus = <String>{};
     for (final ligne in c.text.split('\n')) {
-      final nom = ligne.replaceAll(RegExp(r'\s+'), ' ').trim();
+      var nom = ligne.replaceAll(RegExp(r'\s+'), ' ').trim();
+      if (minuscules) nom = premiereMajuscule(nom);
       if (nom.isEmpty || !vus.add(cleNom(nom))) continue;
       saisis.add(nom);
     }
@@ -148,7 +172,7 @@ class _ListeNomsState extends State<_ListeNoms> {
     final messenger = ScaffoldMessenger.of(context);
     try {
       final existants = <String>{};
-      final s = await _col.get().timeout(const Duration(seconds: 8));
+      final s = await _lireTout();
       for (final d in s.docs) {
         existants.add(cleNom((d.data()[widget.champ] ?? '') as String));
       }
@@ -172,6 +196,62 @@ class _ListeNomsState extends State<_ListeNoms> {
     } catch (e) {
       messenger.showSnackBar(SnackBar(content: Text('Ajout impossible : $e')));
     }
+  }
+
+  /// Copie toute la liste (un nom par ligne) dans le presse-papiers.
+  Future<void> _copier() async {
+    final messenger = ScaffoldMessenger.of(context);
+    try {
+      final s = await _lireTout();
+      final noms = [for (final d in s.docs) (d.data()[widget.champ] ?? '') as String]
+        ..sort((a, b) => a.toLowerCase().compareTo(b.toLowerCase()));
+      await Clipboard.setData(ClipboardData(text: noms.join('\n')));
+      messenger.showSnackBar(SnackBar(content: Text('${noms.length} nom(s) copié(s). Vous pouvez les coller où vous voulez.')));
+    } catch (e) {
+      messenger.showSnackBar(SnackBar(content: Text('Copie impossible : $e')));
+    }
+  }
+
+  /// Met tous les noms de la liste en minuscules avec la 1re lettre majuscule (administrateur).
+  Future<void> _convertir() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final s = await _lireTout();
+    final aChanger = [
+      for (final d in s.docs)
+        if (premiereMajuscule((d.data()[widget.champ] ?? '') as String) != (d.data()[widget.champ] ?? ''))
+          d,
+    ];
+    if (aChanger.isEmpty) {
+      messenger.showSnackBar(const SnackBar(content: Text('Tous les noms sont déjà dans ce format.')));
+      return;
+    }
+    final exemples = aChanger
+        .take(3)
+        .map((d) => '${d.data()[widget.champ]}  ->  ${premiereMajuscule(d.data()[widget.champ] as String)}')
+        .join('\n');
+    if (!mounted) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('Changer l\'écriture ?'),
+        content: Text('${aChanger.length} nom(s) seront écrits en minuscules avec la 1re lettre majuscule.\n\n'
+            '$exemples\n\nLes sigles (SRO, ATPE…) perdront leurs majuscules : vous pourrez les corriger un par un. '
+            'Les factures déjà saisies gardent leur ancienne écriture.'),
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('Annuler')),
+          FilledButton(onPressed: () => Navigator.pop(ctx, true), child: const Text('Changer')),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    for (var i = 0; i < aChanger.length; i += 400) {
+      final batch = FirebaseFirestore.instance.batch();
+      for (final d in aChanger.skip(i).take(400)) {
+        batch.update(d.reference, {widget.champ: premiereMajuscule(d.data()[widget.champ] as String)});
+      }
+      unawaited(batch.commit().catchError((_) {}));
+    }
+    messenger.showSnackBar(SnackBar(content: Text('${aChanger.length} nom(s) modifié(s).')));
   }
 
   Future<void> _ajouterCourants() async {
@@ -311,6 +391,29 @@ class _ListeNomsState extends State<_ListeNoms> {
             ),
           ),
         ),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: Padding(
+            padding: const EdgeInsets.only(left: 12, bottom: 4),
+            child: TextButton.icon(
+              onPressed: _copier,
+              icon: const Icon(Icons.copy),
+              label: const Text('Copier toute la liste'),
+            ),
+          ),
+        ),
+        if (admin && widget.collection == 'produits')
+          Align(
+            alignment: Alignment.centerLeft,
+            child: Padding(
+              padding: const EdgeInsets.only(left: 12, bottom: 4),
+              child: TextButton.icon(
+                onPressed: _convertir,
+                icon: const Icon(Icons.text_fields),
+                label: const Text('Mettre en 1re lettre majuscule'),
+              ),
+            ),
+          ),
         if (widget.collection == 'produits')
           Align(
             alignment: Alignment.centerLeft,

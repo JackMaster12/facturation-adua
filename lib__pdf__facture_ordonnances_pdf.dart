@@ -103,12 +103,15 @@ Future<Uint8List> genererPdfOrdonnances({
   required DateTime arreteLe,
 }) async {
   final normal = pw.Font.helvetica();
+  // L'en-tête s'agrandit si le récepteur a des informations supplémentaires.
+  final nbInfos = recepteurInfosLignes.length;
+  final enteteH = _enteteH + (nbInfos > 2 ? (nbInfos - 2) * 14.0 : 0.0);
   final gras = pw.Font.helveticaBold();
   final grasItalique = pw.Font.helveticaBoldOblique();
   final numero = numeroFacture(facture.mois, facture.annee);
   final titre = 'FACTURE SUR ORDONNANCES ENFANTS N° $numero';
 
-  // Ordre de saisie : enfants dans l'ordre de leur première saisie, ordonnances dans l'ordre de saisie.
+  // Ordre chronologique : enfants selon leur ordonnance la plus ancienne, ordonnances par date croissante.
   final tri = trierOrdonnancesSaisie(ordonnances);
   final numeros = numerosOrdonnances(ordonnances);
   final enfants = <String>[];
@@ -142,7 +145,7 @@ Future<Uint8List> genererPdfOrdonnances({
   final pages = paginer(
     [for (final l in lignes) l.h],
     [for (final l in lignes) l.keep],
-    _contenuH - _enteteH - _colH - _cadreH,
+    _contenuH - enteteH - _colH - _cadreH,
     _contenuH - _colH - _cadreH,
     fin,
   );
@@ -176,7 +179,7 @@ Future<Uint8List> genererPdfOrdonnances({
       );
 
   pw.Widget entete() => pw.SizedBox(
-        height: _enteteH,
+        height: enteteH,
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             pw.Expanded(
@@ -187,6 +190,7 @@ Future<Uint8List> genererPdfOrdonnances({
                 pw.SizedBox(height: 10),
                 pw.Text('Récepteur : $recepteurNom', style: _st(gras)),
                 pw.Text('Adresse : $recepteurAdresse', style: _st(normal)),
+                for (final t in recepteurInfosLignes) pw.Text(t, style: _st(normal)),
               ]),
             ),
             pw.SizedBox(

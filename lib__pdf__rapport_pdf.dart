@@ -47,6 +47,9 @@ Future<Uint8List> genererPdfRapport({
   required bool manuel,
 }) async {
   final normal = pw.Font.times();
+  // L'en-tête s'agrandit si le récepteur a des informations supplémentaires.
+  final nbInfos = recepteurInfosLignes.length;
+  final enteteH = _enteteH + (nbInfos > 3 ? (nbInfos - 3) * 14.0 : 0.0);
   final gras = pw.Font.timesBold();
   final tries = [...mois]..sort((a, b) => (a.annee * 100 + a.mois).compareTo(b.annee * 100 + b.mois));
   final titre = 'RAPPORT : ${titreRapport(tries)}';
@@ -85,7 +88,7 @@ Future<Uint8List> genererPdfRapport({
   final pages = paginer(
     hauteurs,
     [for (final r in rows) r.keep],
-    _contenuH - _enteteH - _colH - 6,
+    _contenuH - enteteH - _colH - 6,
     _contenuH - _colH - 6,
     fin,
   );
@@ -128,7 +131,7 @@ Future<Uint8List> genererPdfRapport({
   }
 
   pw.Widget entete() => pw.SizedBox(
-        height: _enteteH,
+        height: enteteH,
         child: pw.Column(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
           pw.Row(crossAxisAlignment: pw.CrossAxisAlignment.start, children: [
             pw.Expanded(
@@ -140,6 +143,7 @@ Future<Uint8List> genererPdfRapport({
                 pw.SizedBox(height: 10),
                 pw.Text('Récepteur : $recepteurNom', style: _st(gras)),
                 pw.Text('Adresse : $recepteurAdresse', style: _st(normal)),
+                for (final t in recepteurInfosLignes) pw.Text(t, style: _st(normal)),
               ]),
             ),
             pw.SizedBox(

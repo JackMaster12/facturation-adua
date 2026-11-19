@@ -14,6 +14,9 @@ class _LigneEdit {
   String produit;
   final TextEditingController qte;
   final TextEditingController montant;
+  final FocusNode fQte = FocusNode();
+  final FocusNode fMontant = FocusNode();
+  final GlobalKey<SelecteurNomState> cle = GlobalKey<SelecteurNomState>();
 }
 
 class OrdonnanceFormScreen extends StatefulWidget {
@@ -31,6 +34,24 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
   bool _aRevoir = false;
   final TextEditingController _note = TextEditingController();
   final List<_LigneEdit> _lignes = [];
+  final GlobalKey<SelecteurNomState> _cleEnfant = GlobalKey<SelecteurNomState>();
+
+  /// Exécute l'action une fois l'écran redessiné (après la fermeture d'une liste, par exemple).
+  void _apres(VoidCallback f) => WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) f();
+      });
+
+  void _focusQte(_LigneEdit l) {
+    l.qte.selection = TextSelection(baseOffset: 0, extentOffset: l.qte.text.length);
+    l.fQte.requestFocus();
+  }
+
+  /// Nouvelle ligne de produit : la liste des produits s'ouvre aussitôt, prête pour la saisie.
+  void _nouvelleLigne() {
+    final l = _LigneEdit();
+    setState(() => _lignes.add(l));
+    _apres(() => l.cle.currentState?.ouvrir());
+  }
 
   @override
   void initState() {
@@ -101,16 +122,26 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
         TextField(
           controller: _date,
           keyboardType: TextInputType.datetime,
+          textInputAction: TextInputAction.next,
+          onSubmitted: (_) {
+            if (_enfant.isEmpty) _cleEnfant.currentState?.ouvrir();
+          },
           decoration: const InputDecoration(labelText: 'Date (JJ/MM/AAAA)', border: OutlineInputBorder()),
         ),
         const SizedBox(height: 12),
         const Text('Le numéro de l\'ordonnance est attribué automatiquement (1, 2, 3… pour chaque enfant).'),
         const SizedBox(height: 12),
         SelecteurNom(
+          key: _cleEnfant,
           collection: 'beneficiaires',
           libelle: 'Enfant',
           valeur: _enfant,
-          onChoisi: (v) => setState(() => _enfant = v),
+          onChoisi: (v) {
+            setState(() => _enfant = v);
+            // Enchaînement : on passe directement au premier produit encore vide.
+            final vide = _lignes.where((l) => l.produit.isEmpty).toList();
+            if (vide.isNotEmpty) _apres(() => vide.first.cle.currentState?.ouvrir());
+          },
         ),
         const SizedBox(height: 12),
         ChampARevoir(valeur: _aRevoir, note: _note, onChange: (v) => setState(() => _aRevoir = v)),
@@ -125,10 +156,15 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
                 Row(children: [
                   Expanded(
                     child: SelecteurNom(
+                      key: _lignes[i].cle,
                       collection: 'produits',
                       libelle: 'Produit',
                       valeur: _lignes[i].produit,
-                      onChoisi: (v) => setState(() => _lignes[i].produit = v),
+                      onChoisi: (v) {
+                        final l = _lignes[i];
+                        setState(() => l.produit = v);
+                        _apres(() => _focusQte(l));
+                      },
                     ),
                   ),
                   IconButton(
@@ -142,7 +178,10 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
                   Expanded(
                     child: TextField(
                       controller: _lignes[i].qte,
+                      focusNode: _lignes[i].fQte,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
+                      onSubmitted: (_) => _lignes[i].fMontant.requestFocus(),
                       decoration: const InputDecoration(labelText: 'Quantité', border: OutlineInputBorder()),
                     ),
                   ),
@@ -150,8 +189,18 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
                   Expanded(
                     child: TextField(
                       controller: _lignes[i].montant,
+                      focusNode: _lignes[i].fMontant,
                       keyboardType: TextInputType.number,
+                      textInputAction: TextInputAction.next,
                       onChanged: (_) => setState(() {}),
+                      // Entrée : ligne suivante (nouveau produit) si le montant est rempli, sinon on ferme le clavier.
+                      onSubmitted: (_) {
+                        if (i == _lignes.length - 1 && parseEntier(_lignes[i].montant.text) > 0) {
+                          _nouvelleLigne();
+                        } else {
+                          FocusScope.of(context).unfocus();
+                        }
+                      },
                       decoration: const InputDecoration(labelText: 'Montant (FCFA)', border: OutlineInputBorder()),
                     ),
                   ),
@@ -160,7 +209,7 @@ class _OrdonnanceFormScreenState extends State<OrdonnanceFormScreen> {
             ),
           ),
         TextButton.icon(
-          onPressed: () => setState(() => _lignes.add(_LigneEdit())),
+          onPressed: _nouvelleLigne,
           icon: const Icon(Icons.add),
           label: const Text('Ajouter un produit'),
         ),

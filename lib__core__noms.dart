@@ -15,3 +15,10 @@ String cleNom(String s) {
       .replaceAll(RegExp(r'\s+'), ' ')
       .trim();
 }
+
+/// « PARACETAMOL 500 MG » -> « Paracetamol 500 mg » : tout en minuscules, sauf la 1re lettre.
+String premiereMajuscule(String s) {
+  final t = s.replaceAll(RegExp(r'\s+'), ' ').trim().toLowerCase();
+  if (t.isEmpty) return t;
+  return t[0].toUpperCase() + t.substring(1);
+}

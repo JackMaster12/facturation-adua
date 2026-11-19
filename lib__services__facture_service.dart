@@ -15,20 +15,31 @@ class FactureService {
   CollectionReference<Map<String, dynamic>> get _col => _db.collection('factures');
 
   /// Crée la facture du mois. Retourne false si elle existe déjà.
+  /// Fonctionne aussi hors connexion : la facture est créée sur le téléphone puis envoyée au retour du réseau.
   Future<bool> creer(String type, int mois, int annee) async {
     final id = idFacture(type, mois, annee);
     final ref = _col.doc(id);
-    final d = await ref.get();
-    if (d.exists) return false;
-    unawaited(ref.set({
+    bool? existe;
+    try {
+      existe = (await ref.get(const GetOptions(source: Source.cache))).exists;
+    } catch (_) {}
+    if (existe != true) {
+      try {
+        existe = (await ref.get().timeout(const Duration(seconds: 4))).exists;
+      } catch (_) {}
+    }
+    if (existe == true) return false;
+    final donnees = <String, dynamic>{
       'type': type,
       'mois': mois,
       'annee': annee,
       'numero': numeroFacture(mois, annee),
-      'statut': 'en_cours',
       'creeLe': FieldValue.serverTimestamp(),
       'creePar': FirebaseAuth.instance.currentUser?.uid,
-    }).catchError((_) {}));
+    };
+    // Si on n'a pas pu vérifier (hors connexion), on ne touche pas au statut d'une facture déjà existante.
+    if (existe == false) donnees['statut'] = 'en_cours';
+    unawaited(ref.set(donnees, SetOptions(merge: true)).catchError((_) {}));
     return true;
   }
 
