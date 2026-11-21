@@ -1,4 +1,5 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter/material.dart';
 
 import '../core/format.dart';
@@ -87,7 +88,22 @@ class VentesHistoriqueScreen extends StatelessWidget {
       body: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
         stream: FirebaseFirestore.instance.collection('ventes').orderBy('date', descending: true).limit(100).snapshots(),
         builder: (context, snap) {
-          if (snap.hasError) return const Center(child: Text('Erreur de lecture des données.'));
+          if (snap.hasError) {
+            final e = snap.error;
+            final refus = e is FirebaseException && e.code == 'permission-denied';
+            return Center(
+              child: Padding(
+                padding: const EdgeInsets.all(24),
+                child: Text(
+                  refus
+                      ? 'Accès refusé aux ventes.\n\nLes règles Firebase ne sont pas à jour : copiez le fichier '
+                          'firestore.rules dans Firebase Console > Firestore > Règles, puis Publier.'
+                      : 'Erreur de lecture des ventes :\n$e',
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            );
+          }
           if (!snap.hasData) return const Center(child: CircularProgressIndicator());
           final ventes = [for (final d in snap.data!.docs) VenteData.fromDoc(d)]
             ..sort((a, b) {

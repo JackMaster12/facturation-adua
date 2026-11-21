@@ -44,6 +44,8 @@ class _VenteScreenState extends State<VenteScreen> {
   Map<String, int> _prix = {};
   String? _id; // identifiant de la vente enregistrée (les actions suivantes mettent à jour la même vente)
   String? _numero;
+  VenteData? _vente; // vente enregistrée (le reçu n'est proposé qu'après l'enregistrement)
+  String _sigSauvee = '';
   int _largeur = Entreprise.courant.largeurRecu;
 
   @override
@@ -85,8 +87,14 @@ class _VenteScreenState extends State<VenteScreen> {
         ..add(_LigneV());
       _id = null;
       _numero = null;
+      _vente = null;
+      _sigSauvee = '';
     });
   }
+
+  /// Résumé de la saisie : sert à savoir si le formulaire a changé depuis l'enregistrement.
+  String _signature() =>
+      '${_date.text.trim()}|${_client.text.trim()}|${[for (final l in _lignes) '${l.produit}/${l.q}/${l.p}'].join(';')}';
 
   void _choisirLargeur(int mm) {
     setState(() => _largeur = mm);
@@ -143,19 +151,36 @@ class _VenteScreenState extends State<VenteScreen> {
       ...v.toMap(),
       'creeLe': FieldValue.serverTimestamp(),
       'creePar': FirebaseAuth.instance.currentUser?.uid,
-    }, SetOptions(merge: true)).catchError((_) {}));
+    }, SetOptions(merge: true)).then((_) {}, onError: (_) {
+      if (mounted) {
+        _msg('Le reçu est prêt, mais la vente n\'a pas pu être enregistrée dans l\'historique '
+            '(règles Firebase à publier).');
+      }
+    }));
     return v;
   }
 
-  Future<void> _agir(Future<void> Function(BuildContext, VenteData) action) async {
+  /// Bouton « Enregistrer la vente » : vérifie la saisie, enregistre, puis propose le reçu.
+  void _enregistrer() {
     final v = _preparer();
     if (v == null) return;
     FocusScope.of(context).unfocus();
+    setState(() {
+      _vente = v;
+      _sigSauvee = _signature();
+    });
+    _msg('Vente enregistrée. Vous pouvez imprimer ou partager le reçu.');
+  }
+
+  Future<void> _agir(Future<void> Function(BuildContext, VenteData) action) async {
+    final v = _vente;
+    if (v == null) return;
     await action(context, v);
   }
 
   @override
   Widget build(BuildContext context) {
+    final sauvee = _vente != null && _signature() == _sigSauvee;
     return Scaffold(
       appBar: AppBar(
         title: const Text('Vente'),
@@ -292,31 +317,53 @@ class _VenteScreenState extends State<VenteScreen> {
               Text('TOTAL : ${formatMontant(_total)} FCFA',
                   style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
               const SizedBox(height: 8),
-              Row(children: [
-                Expanded(
+              if (!sauvee)
+                SizedBox(
+                  width: double.infinity,
                   child: FilledButton.icon(
-                    onPressed: () => _agir(imprimerRecu),
-                    icon: const Icon(Icons.print),
-                    label: const Text('Imprimer'),
+                    onPressed: _enregistrer,
+                    icon: const Icon(Icons.check_circle_outline),
+                    label: Padding(
+                      padding: const EdgeInsets.all(8),
+                      child: Text(_vente == null ? 'Enregistrer la vente' : 'Mettre à jour la vente'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _agir(partagerRecuImage),
-                    icon: const Icon(Icons.image_outlined),
-                    label: const Text('Image'),
+                )
+              else ...[
+                Text('✔ Vente enregistrée · Reçu N° ${_vente!.numero}',
+                    style: const TextStyle(color: Color(0xFF2E7D32), fontWeight: FontWeight.bold)),
+                const SizedBox(height: 8),
+                Row(children: [
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: () => _agir(imprimerRecu),
+                      icon: const Icon(Icons.print),
+                      label: const Text('Imprimer'),
+                    ),
                   ),
-                ),
-                const SizedBox(width: 8),
-                Expanded(
-                  child: FilledButton.tonalIcon(
-                    onPressed: () => _agir(partagerRecuPdf),
-                    icon: const Icon(Icons.picture_as_pdf_outlined),
-                    label: const Text('PDF'),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _agir(partagerRecuImage),
+                      icon: const Icon(Icons.image_outlined),
+                      label: const Text('Image'),
+                    ),
                   ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: FilledButton.tonalIcon(
+                      onPressed: () => _agir(partagerRecuPdf),
+                      icon: const Icon(Icons.picture_as_pdf_outlined),
+                      label: const Text('PDF'),
+                    ),
+                  ),
+                ]),
+                TextButton.icon(
+                  onPressed: _nouvelleVente,
+                  icon: const Icon(Icons.add),
+                  label: const Text('Nouvelle vente'),
                 ),
-              ]),
+              ],
             ]),
           ),
         ),
