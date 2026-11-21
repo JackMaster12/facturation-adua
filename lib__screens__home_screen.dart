@@ -10,6 +10,8 @@ import 'factures_terminees_screen.dart';
 import 'nouvelle_facture_screen.dart';
 import 'rapport_genere_screen.dart';
 import 'rapports_ecrits_screen.dart';
+import 'vente_screen.dart';
+import 'ventes_historique_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   const HomeScreen({super.key});
@@ -53,6 +55,10 @@ class HomeScreen extends StatelessWidget {
                 () => aller(const NouvelleFactureScreen(type: 'commandes'))),
             _Bouton('Facture en cours', Icons.local_shipping_outlined,
                 () => aller(const FacturesEnCoursScreen(type: 'commandes'))),
+          ]),
+          _Section('Ventes', const Color(0xFF00838F), [
+            _Bouton('Vente', Icons.point_of_sale, () => aller(const VenteScreen())),
+            _Bouton('Historique', Icons.receipt_long, () => aller(VentesHistoriqueScreen(profil: p))),
           ]),
           _Section('Documents', const Color(0xFFEF6C00), [
             _Bouton('Factures terminées', Icons.task_alt, () => aller(FacturesTermineesScreen(profil: p))),

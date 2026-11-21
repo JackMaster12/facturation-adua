@@ -1,0 +1,79 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    function connecte() { return request.auth != null; }
+    function profil() { return get(/databases/$(database)/documents/users/$(request.auth.uid)).data; }
+    function actif() { return connecte() && exists(/databases/$(database)/documents/users/$(request.auth.uid)) && profil().actif == true; }
+    function admin() { return actif() && profil().role == 'admin'; }
+
+    // Premier lancement : création de l'administrateur principal, une seule fois.
+    match /config/setup {
+      allow read: if true;
+      allow create: if connecte() && !exists(/databases/$(database)/documents/config/setup);
+      allow update, delete: if false;
+    }
+
+    match /users/{uid} {
+      allow read: if connecte() && (request.auth.uid == uid || admin());
+      // Premier administrateur (avant la création de config/setup)
+      allow create: if connecte() && request.auth.uid == uid
+                    && request.resource.data.role == 'admin'
+                    && !exists(/databases/$(database)/documents/config/setup);
+      // Comptes créés par l'administrateur
+      allow create: if admin() && request.resource.data.role == 'utilisateur';
+      allow update: if admin() && resource.data.role != 'admin';
+      allow delete: if false;
+    }
+
+    match /parametres/{doc} {
+      allow read: if actif();
+      allow write: if admin();
+    }
+
+    // Enfants et produits : tout utilisateur actif ajoute ; l'admin modifie et supprime.
+    match /beneficiaires/{id} {
+      allow read: if actif();
+      allow create: if actif();
+      allow update, delete: if admin();
+    }
+    match /produits/{id} {
+      allow read: if actif();
+      allow create: if actif();
+      allow update, delete: if admin();
+    }
+
+    match /unites/{id} {
+      allow read: if actif();
+      allow create: if actif();
+      allow update, delete: if admin();
+    }
+
+    // Ventes au comptoir (reçus) : tout utilisateur actif enregistre ; l'admin supprime.
+    match /ventes/{id} {
+      allow read: if actif();
+      allow create, update: if actif();
+      allow delete: if admin();
+    }
+
+    // Factures (phases 2 et 3). Une facture terminée n'est modifiable que par l'admin (réouverture).
+    match /factures/{id} {
+      allow read: if actif();
+      allow create: if actif();
+      allow update: if actif() && (resource.data.statut == 'en_cours' || admin());
+      allow delete: if admin();
+
+      match /{sous}/{sid} {
+        allow read: if actif();
+        allow write: if actif() && (get(/databases/$(database)/documents/factures/$(id)).data.statut == 'en_cours' || admin());
+      }
+    }
+
+    // Rapports rédigés à la main (phase 4) : tous les utilisateurs rédigent, l'admin supprime.
+    match /rapports/{id} {
+      allow read: if actif();
+      allow create, update: if actif();
+      allow delete: if admin();
+    }
+  }
+}

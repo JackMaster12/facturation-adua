@@ -20,6 +20,7 @@ class Entreprise {
     this.recepteurNom = 'ONG GRYK',
     this.recepteurAdresse = 'Zinder',
     List<InfoSup>? recepteurInfos,
+    this.largeurRecu = 58,
   }) : recepteurInfos = recepteurInfos ?? [];
 
   String emetteurNom;
@@ -30,6 +31,7 @@ class Entreprise {
   String recepteurNom;
   String recepteurAdresse;
   List<InfoSup> recepteurInfos;
+  int largeurRecu; // largeur du papier des reçus de vente : 58 ou 80 mm
 
   static Entreprise courant = Entreprise();
 
@@ -42,6 +44,7 @@ class Entreprise {
         'recepteurNom': recepteurNom,
         'recepteurAdresse': recepteurAdresse,
         'recepteurInfos': [for (final i in recepteurInfos) i.toMap()],
+        'largeurRecu': largeurRecu,
       };
 
   factory Entreprise.fromMap(Map<String, dynamic> m) {
@@ -59,6 +62,7 @@ class Entreprise {
       emetteurBanque: lire('emetteurBanque', d.emetteurBanque),
       recepteurNom: lire('recepteurNom', d.recepteurNom),
       recepteurAdresse: lire('recepteurAdresse', d.recepteurAdresse),
+      largeurRecu: m['largeurRecu'] is num && (m['largeurRecu'] as num).toInt() == 80 ? 80 : 58,
       recepteurInfos: [
         for (final e in (m['recepteurInfos'] is List ? m['recepteurInfos'] as List : const []))
           if (e is Map)

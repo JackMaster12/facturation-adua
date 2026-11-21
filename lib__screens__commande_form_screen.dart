@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../core/dates.dart';
 import '../core/format.dart';
 import '../models/ordonnance.dart';
+import '../core/noms.dart';
 import '../services/facture_service.dart';
+import '../services/prix_service.dart';
 import '../services/unites_service.dart';
 import '../widgets/a_revoir.dart';
 import '../widgets/selecteur_nom.dart';
@@ -16,6 +18,7 @@ class _LigneEdit {
   String unite;
   final TextEditingController qte;
   final TextEditingController montant;
+  bool manuel = false; // vrai si le montant a été saisi ou fixé à la main
   final FocusNode fQte = FocusNode();
   final FocusNode fMontant = FocusNode();
   final GlobalKey<SelecteurNomState> cle = GlobalKey<SelecteurNomState>();
@@ -43,6 +46,19 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
         if (mounted) f();
       });
 
+  Map<String, int> _prix = {};
+
+  int? _prixCatalogue(_LigneEdit l) => _prix[cleNom(l.produit)];
+
+  /// Montant proposé automatiquement : prix du produit × quantité (modifiable ensuite à la main).
+  void _autoMontant(_LigneEdit l) {
+    if (l.manuel) return;
+    final p = _prixCatalogue(l);
+    if (p == null) return;
+    final q = parseEntier(l.qte.text);
+    l.montant.text = '${p * (q > 0 ? q : 1)}';
+  }
+
   void _focusQte(_LigneEdit l) {
     l.qte.selection = TextSelection(baseOffset: 0, extentOffset: l.qte.text.length);
     l.fQte.requestFocus();
@@ -58,6 +74,9 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
   @override
   void initState() {
     super.initState();
+    chargerPrixProduits().then((m) {
+      if (mounted) setState(() => _prix = m);
+    });
     final c = widget.commande;
     _date = TextEditingController(text: formatDate(c?.date ?? DateTime.now()));
     _libelle = TextEditingController(text: c?.libelle ?? '');
@@ -67,6 +86,9 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
       for (final l in c.lignes) {
         _lignes.add(_LigneEdit(produit: l.produit, unite: l.unite, qte: '${l.quantite}', montant: '${l.montant}'));
       }
+    }
+    for (final l in _lignes) {
+      l.manuel = true; // montants déjà enregistrés : on n'y touche pas
     }
     if (_lignes.isEmpty) _lignes.add(_LigneEdit());
     semerUnites();
@@ -170,7 +192,11 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                       valeur: _lignes[i].produit,
                       onChoisi: (v) {
                         final l = _lignes[i];
-                        setState(() => l.produit = v);
+                        setState(() {
+                          l.produit = v;
+                          l.manuel = false; // nouveau produit : on repart du prix du catalogue
+                          _autoMontant(l);
+                        });
                         // Enchaînement : unité si elle est vide, sinon quantité.
                         _apres(() => l.unite.isEmpty ? l.cleUnite.currentState?.ouvrir() : _focusQte(l));
                       },
@@ -203,7 +229,7 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
                       onSubmitted: (_) => _lignes[i].fMontant.requestFocus(),
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (_) => setState(() => _autoMontant(_lignes[i])),
                       decoration: const InputDecoration(labelText: 'Quantité', border: OutlineInputBorder()),
                     ),
                   ),
@@ -214,7 +240,7 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                       focusNode: _lignes[i].fMontant,
                       keyboardType: TextInputType.number,
                       textInputAction: TextInputAction.next,
-                      onChanged: (_) => setState(() {}),
+                      onChanged: (v) => setState(() => _lignes[i].manuel = v.trim().isNotEmpty),
                       // Entrée : ligne suivante (nouveau produit) si le montant est rempli, sinon on ferme le clavier.
                       onSubmitted: (_) {
                         if (i == _lignes.length - 1 && parseEntier(_lignes[i].montant.text) > 0) {
@@ -223,7 +249,13 @@ class _CommandeFormScreenState extends State<CommandeFormScreen> {
                           FocusScope.of(context).unfocus();
                         }
                       },
-                      decoration: const InputDecoration(labelText: 'Montant total (FCFA)', border: OutlineInputBorder()),
+                      decoration: InputDecoration(
+                        labelText: 'Montant total (FCFA)',
+                        border: const OutlineInputBorder(),
+                        helperText: _prixCatalogue(_lignes[i]) == null
+                            ? null
+                            : 'Prix : ${formatMontant(_prixCatalogue(_lignes[i])!)} l\'unité',
+                      ),
                     ),
                   ),
                 ]),

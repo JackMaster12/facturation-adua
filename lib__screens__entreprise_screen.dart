@@ -49,6 +49,7 @@ class _EntrepriseScreenState extends State<EntrepriseScreen> {
 
   void _enregistrer() {
     final m = <String, dynamic>{for (final k in _champs.keys) k: _c[k]!.text.trim()};
+    m['largeurRecu'] = Entreprise.courant.largeurRecu; // réglé dans l'écran de vente : à conserver
     m['recepteurInfos'] = [
       for (final i in _infos)
         if (i.$1.text.trim().isNotEmpty || i.$2.text.trim().isNotEmpty)

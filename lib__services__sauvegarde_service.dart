@@ -22,7 +22,7 @@ Future<void> sauvegarderDonnees() async {
     'application': 'FACTURATION ADUA',
     'sauvegardeLe': DateTime.now().toIso8601String(),
   };
-  for (final c in ['beneficiaires', 'produits', 'unites', 'rapports', 'parametres']) {
+  for (final c in ['beneficiaires', 'produits', 'unites', 'rapports', 'parametres', 'ventes']) {
     final s = await db.collection(c).get();
     sortie[c] = {for (final d in s.docs) d.id: _json(d.data())};
   }
